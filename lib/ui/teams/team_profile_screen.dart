@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+// Import PlayerProfileScreen later when created
+// import 'package:hockey_union_app/ui/players/player_profile_screen.dart';
 
 class TeamProfileScreen extends StatelessWidget {
   final String teamId; // The ID of the team to display
@@ -16,18 +18,18 @@ class TeamProfileScreen extends StatelessWidget {
         // Fetch the specific team document from Firestore
         future: FirebaseFirestore.instance.collection('teams').doc(teamId).get(),
         builder: (context, snapshot) {
-          // Show loading indicator
+          // Show loading indicator for team data
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
           }
 
-          // Handle errors
+          // Handle errors fetching team data
           if (snapshot.hasError) {
             print("Error fetching team data: ${snapshot.error}");
             return Center(child: Text('Error loading team profile.'));
           }
 
-          // Handle case where document doesn't exist
+          // Handle case where team document doesn't exist
           if (!snapshot.hasData || !snapshot.data!.exists) {
             return Center(child: Text('Team not found.'));
           }
@@ -38,19 +40,11 @@ class TeamProfileScreen extends StatelessWidget {
           final coachName = teamData['coachName'] ?? 'N/A';
           final contactNumber = teamData['contactNumber'] ?? 'N/A';
           // Add other fields you might have or add later (e.g., stats, achievements)
-          // final wins = teamData['wins'] ?? 0;
-          // final losses = teamData['losses'] ?? 0;
 
-          // Update AppBar title once data is loaded
+          // Update AppBar title once data is loaded (still a note for StatelessWidget)
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (Navigator.of(context).canPop()) { // Check if screen is still in view
-              // This is a common pattern to update AppBar title from FutureBuilder
-              // It might cause a slight flicker, but works for StatelessWidget
-              // For a more seamless update, consider making this a StatefulWidget
-              // and using setState after data is loaded in initState or didChangeDependencies
-            }
+            // Consider making this a StatefulWidget for smoother title update
           });
-
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -66,27 +60,68 @@ class TeamProfileScreen extends StatelessWidget {
                 SizedBox(height: 8),
                 Text('Contact: $contactNumber', style: TextStyle(fontSize: 18)),
                 SizedBox(height: 24),
-                // Add sections for Players, Stats, Achievements etc. here later
-                Text(
-                  'Team Details:',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 16),
-                // Example: Displaying placeholder stats
-                // Text('Wins: $wins', style: TextStyle(fontSize: 16)),
-                // Text('Losses: $losses', style: TextStyle(fontSize: 16)),
-                // SizedBox(height: 24),
 
-                // TODO: Add a section to list players belonging to this team
-                // This would likely involve another StreamBuilder or FutureBuilder
-                // fetching documents from the 'players' collection where 'teamId' matches this teamId.
+                // --- Section to List Players ---
                 Text(
                   'Players:',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 16),
-                // Placeholder for player list
-                Text('Player list coming soon...', style: TextStyle(fontStyle: FontStyle.italic)),
+
+                // Use a StreamBuilder to fetch players for this team
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('players')
+                      .where('teamId', isEqualTo: teamId) // Filter players by the current teamId
+                      .orderBy('playerName') // Order players alphabetically
+                      .snapshots(),
+                  builder: (context, playerSnapshot) {
+                    // Show loading indicator for player data
+                    if (playerSnapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+
+                    // Handle errors fetching player data
+                    if (playerSnapshot.hasError) {
+                      print("Error fetching players: ${playerSnapshot.error}");
+                      return Text('Error loading players.');
+                    }
+
+                    final players = playerSnapshot.data!.docs;
+
+                    if (players.isEmpty) {
+                      return Text('No players registered for this team yet.', style: TextStyle(fontStyle: FontStyle.italic));
+                    }
+
+                    // Display the list of players
+                    return ListView.builder(
+                      shrinkWrap: true, // Important: Allows ListView inside SingleChildScrollView
+                      physics: NeverScrollableScrollPhysics(), // Important: Disables ListView's own scrolling
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index].data() as Map<String, dynamic>;
+                        final playerId = players[index].id; // Get player document ID
+
+                        return ListTile(
+                          leading: Icon(Icons.person), // Player icon
+                          title: Text(player['playerName'] ?? 'Unknown Player'),
+                          subtitle: Text('Position: ${player['position'] ?? 'N/A'}'),
+                          // Add onTap here to navigate to Player Profile screen later
+                          // onTap: () {
+                          //   Navigator.push(
+                          //     context,
+                          //     MaterialPageRoute(
+                          //       builder: (context) => PlayerProfileScreen(playerId: playerId),
+                          //     ),
+                          //   );
+                          // },
+                        );
+                      },
+                    );
+                  },
+                ),
+                // --- End of Player List Section ---
+
               ],
             ),
           );

@@ -1,9 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Import Firebase Messaging
+import 'package:hockey_union_app/services/fcm_service.dart'; // Import the new FcmService
+
 
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FcmService _fcmService = FcmService(); // Create an instance of FcmService
+
 
   // Get the current user
   User? getCurrentUser() {
@@ -11,20 +16,25 @@ class AuthService {
   }
 
   // Sign in with email and password
-  // We can add specific error handling here later too if needed
   Future<User?> signInWithEmailAndPassword(String email, String password) async {
     try {
       UserCredential result = await _firebaseAuth.signInWithEmailAndPassword(
           email: email, password: password);
-      return result.user;
-    } on FirebaseAuthException catch (e) { // Catch specific Firebase Auth exceptions
+      User? user = result.user;
+
+      if (user != null) {
+        // User signed in successfully, get and save FCM token using FcmService
+        String? fcmToken = await FirebaseMessaging.instance.getToken();
+        await _fcmService.saveTokenToFirestore(fcmToken); // Use the new service
+      }
+
+      return user;
+    } on FirebaseAuthException catch (e) {
       print("Firebase Auth Error during Sign In: ${e.code} - ${e.message}");
-      // Return null, and the AuthScreen will handle displaying a generic error
-      // Or you could return e.code to handle specific messages in the UI
-      return null;
+      return null; // Return null on error
     } catch (e) {
       print("General Error during Sign In: ${e.toString()}");
-      return null;
+      return null; // Return null on error
     }
   }
 
@@ -37,27 +47,25 @@ class AuthService {
 
       if (user != null) {
         // Create a new document for the user in the 'users' collection
-        // Use the user's UID as the document ID
         await _firestore.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email,
           'role': 'Fan', // Assign a default role, e.g., 'Fan'
           'createdAt': FieldValue.serverTimestamp(),
-          // You can add other initial fields here (e.g., name, etc.)
         });
+
+        // User signed up successfully, get and save FCM token using FcmService
+        String? fcmToken = await FirebaseMessaging.instance.getToken();
+        await _fcmService.saveTokenToFirestore(fcmToken); // Use the new service
       }
 
       return user;
-    } on FirebaseAuthException catch (e) { // Catch specific Firebase Auth exceptions
+    } on FirebaseAuthException catch (e) {
       print("Firebase Auth Error during Sign Up: ${e.code} - ${e.message}");
-      // Return the error code so the UI can display a specific message
-      // Or you could return a custom string based on the code
-      // For now, let's return null and handle messaging in AuthScreen
-      // return e.code; // Option 1: Return code
-      return null; // Option 2: Return null, handle message in UI based on error type
+      return null; // Return null on error
     } catch (e) {
       print("General Error during Sign Up: ${e.toString()}");
-      return null;
+      return null; // Return null on error
     }
   }
 
@@ -77,10 +85,30 @@ class AuthService {
     }
   }
 
+  // Method to send password reset email
+  Future<String?> sendPasswordResetEmail(String email) async {
+    try {
+      await _firebaseAuth.sendPasswordResetEmail(email: email);
+      return null; // Return null on success
+    } on FirebaseAuthException catch (e) {
+      print("Firebase Auth Error sending password reset email: ${e.code} - ${e.message}");
+      return e.code; // Return error code on failure
+    } catch (e) {
+      print("General Error sending password reset email: ${e.toString()}");
+      return 'unknown-error'; // Return a generic error code
+    }
+  }
+
 
   // Sign out
   Future<void> signOut() async {
     try {
+      // Optional: Consider removing the FCM token from Firestore on sign out
+      // This prevents sending notifications to a device after the user logs out.
+      // However, if the user has multiple devices logged in, you'd only want to remove
+      // the token for the device that is signing out. This requires more complex token management.
+      // For now, we'll leave tokens in place on sign out.
+
       return await _firebaseAuth.signOut();
     } catch (e) {
       print(e.toString());

@@ -120,7 +120,7 @@ class HomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => TeamListScreen()),
+                          MaterialPageRoute(builder: (context) => TeamListScreen(userId: userId,)),
                         );
                       },
                     ),
