@@ -1,13 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-// import 'package:hockey_union_app/ui/home_screen.dart'; // Self-referential, remove this import
+// Removed self-referential import: import 'package:hockey_union_app/ui/home_screen.dart';
 import 'package:hockey_union_app/ui/teams/team_list_screen.dart';
 import 'package:hockey_union_app/ui/teams/teams_registration_screen.dart';
 
 import '../services/auth_service.dart';
+import 'booking/user_booking_screen.dart';
+import 'events/events_list.dart';
 import 'matches/add_edit_match_screen.dart';
 import 'matches/match_scheduler_screen.dart';
-import 'news/news_list_screen.dart'; // Import the NewsListScreen
+import 'news/news_list_screen.dart';
+
+
 
 class HomeScreen extends StatelessWidget {
   final String userId; // Accept the user ID passed from Wrapper
@@ -95,23 +99,21 @@ class HomeScreen extends StatelessWidget {
                     SizedBox(height: 20), // Space between welcome text and buttons
 
                     // --- Navigation Buttons (Conditional based on Role) ---
+                    // Buttons are stretched horizontally due to crossAxisAlignment: CrossAxisAlignment.stretch on the parent Column
 
                     // Button for Registering a Team (e.g., only for Coach or Admin)
-                    if (userRole == 'Coach' || userRole == 'Admin')
-                      Column( // Wrap in Column to ensure spacing applies correctly
-                        children: [
-                          ElevatedButton(
-                            child: Text('Register a Team'),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => TeamRegistrationScreen()),
-                              );
-                            },
-                          ),
-                          SizedBox(height: 10),
-                        ],
+                    if (userRole == 'Coach' || userRole == 'Admin') ...[ // Use spread operator with if
+                      ElevatedButton(
+                        child: Text('Register a Team'),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => TeamRegistrationScreen()),
+                          );
+                        },
                       ),
+                      SizedBox(height: 10), // Place SizedBox directly after the button
+                    ],
 
 
                     // Button for Viewing Teams (e.g., for all roles)
@@ -127,19 +129,16 @@ class HomeScreen extends StatelessWidget {
                     SizedBox(height: 10),
 
                     // Button for Managing Players (e.g., only for Coach or Admin)
-                    if (userRole == 'Coach' || userRole == 'Admin')
-                      Column( // Wrap in Column for spacing
-                        children: [
-                          ElevatedButton(
-                            child: Text('Manage Players'),
-                            onPressed: () {
-                              // TODO: Navigate to Player Management Screen
-                              print('Navigate to Player Management Screen');
-                            },
-                          ),
-                          SizedBox(height: 10),
-                        ],
+                    if (userRole == 'Coach' || userRole == 'Admin') ...[ // Use spread operator with if
+                      ElevatedButton(
+                        child: Text('Manage Players'),
+                        onPressed: () {
+                          // TODO: Navigate to Player Management Screen
+                          print('Navigate to Player Management Screen');
+                        },
                       ),
+                      SizedBox(height: 10), // Place SizedBox directly after the button
+                    ],
 
 
                     // Button for Viewing Match Schedule (for all roles)
@@ -156,21 +155,42 @@ class HomeScreen extends StatelessWidget {
                     SizedBox(height: 10),
 
                     // Button for Adding New Match (only for Coach or Admin)
-                    if (userRole == 'Coach' || userRole == 'Admin')
-                      Column( // Wrap in Column for spacing
-                        children: [
-                          ElevatedButton(
-                            child: Text('Add New Match'),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => AddEditMatchScreen()), // Navigate without matchId for adding
-                              );
-                            },
-                          ),
-                          SizedBox(height: 10),
-                        ],
+                    if (userRole == 'Coach' || userRole == 'Admin') ...[ // Use spread operator with if
+                      ElevatedButton(
+                        child: Text('Add New Match'),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => AddEditMatchScreen()), // Navigate without matchId for adding
+                          );
+                        },
                       ),
+                      SizedBox(height: 10), // Place SizedBox directly after the button
+                    ],
+
+                    // Button for Viewing Events (for all roles)
+                    ElevatedButton(
+                      child: Text('View Events'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => EventListScreen()),
+                        );
+                      },
+                    ),
+                    SizedBox(height: 10),
+
+                    // Button for Viewing My Bookings (for all roles - if logged in)
+                    ElevatedButton(
+                      child: Text('My Bookings'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => UserBookingsScreen()),
+                        );
+                      },
+                    ),
+                    SizedBox(height: 10),
 
 
                     // Button for Real-time Info (News) (for all roles)
@@ -189,18 +209,15 @@ class HomeScreen extends StatelessWidget {
 
                     // Add other buttons here, wrapped in 'if' conditions based on userRole
                     // Example: Admin-only button
-                    // if (userRole == 'Admin')
-                    //   Column( // Wrap in Column for spacing
-                    //     children: [
-                    //       ElevatedButton(
-                    //         child: Text('Admin Panel'),
-                    //         onPressed: () {
-                    //           // Navigate to Admin Panel
-                    //         },
-                    //       ),
-                    //       SizedBox(height: 10),
-                    //     ],
+                    // if (userRole == 'Admin') ...[ // Use spread operator with if
+                    //   ElevatedButton(
+                    //     child: Text('Admin Panel'),
+                    //     onPressed: () {
+                    //       // Navigate to Admin Panel
+                    //     },
                     //   ),
+                    //   SizedBox(height: 10), // Place SizedBox directly after the button
+                    // ],
                   ],
                 ),
               ),
