@@ -1,0 +1,2 @@
+C:/Users/Charmaine.Musheko/Downloads/hockey_union_app/android/app/.cxx/RelWithDebInfo/5k4455w1/x86/CMakeFiles/edit_cache.dir
+C:/Users/Charmaine.Musheko/Downloads/hockey_union_app/android/app/.cxx/RelWithDebInfo/5k4455w1/x86/CMakeFiles/rebuild_cache.dir

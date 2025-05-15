@@ -4,6 +4,8 @@ import 'package:hockey_union_app/ui/players/player_registration_screen.dart';
 import 'package:hockey_union_app/services/auth_service.dart'; // Import AuthService to get user data
 
 import '../players/player_list_screen.dart';
+import '../teams/team_profile_screen.dart'; // Import TeamProfileScreen
+
 
 // Update TeamListScreen to accept the userId
 class TeamListScreen extends StatelessWidget {
@@ -84,10 +86,8 @@ class TeamListScreen extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => PlayerRegistrationScreen(
-                                    teamId: teamDocId, // Use the document ID
-                                    teamName: team['teamName'] ?? 'Unknown',
-                                  ),
+                                  // Corrected: Removed teamId and teamName parameters
+                                  builder: (context) => PlayerRegistrationScreen(),
                                 ),
                               );
                             },
@@ -111,14 +111,14 @@ class TeamListScreen extends StatelessWidget {
                       )
                           : null, // Set trailing to null if user cannot manage players
                       // Add onTap here if you want to navigate to Team Profile from the ListTile itself
-                      // onTap: () {
-                      //   Navigator.push(
-                      //     context,
-                      //     MaterialPageRoute(
-                      //       builder: (context) => TeamProfileScreen(teamId: teamDocId),
-                      //     ),
-                      //   );
-                      // },
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TeamProfileScreen(teamId: teamDocId),
+                          ),
+                        );
+                      },
                     ),
                   );
                 },

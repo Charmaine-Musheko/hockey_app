@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:hockey_union_app/ui/players/manage_players_screen.dart';
 // Removed self-referential import: import 'package:hockey_union_app/ui/home_screen.dart';
 import 'package:hockey_union_app/ui/teams/team_list_screen.dart';
 import 'package:hockey_union_app/ui/teams/teams_registration_screen.dart';
@@ -28,8 +29,8 @@ class HomeScreen extends StatelessWidget {
         actions: [
           // Add a Logout button to the AppBar
           TextButton.icon(
-            icon: Icon(Icons.logout, color: Colors.white),
-            label: Text('Logout', style: TextStyle(color: Colors.white)),
+            icon: Icon(Icons.logout, color: Colors.indigo),
+            label: Text('Logout', style: TextStyle(color: Colors.black87)),
             onPressed: () async {
               await _auth.signOut(); // Call the signOut method from AuthService
             },
@@ -129,18 +130,22 @@ class HomeScreen extends StatelessWidget {
                     SizedBox(height: 10),
 
                     // Button for Managing Players (e.g., only for Coach or Admin)
-                    if (userRole == 'Coach' || userRole == 'Admin') ...[ // Use spread operator with if
+                    // In your HomeScreen's Column children:
+                    if (userRole == 'Coach' || userRole == 'Admin') ...[
                       ElevatedButton(
                         child: Text('Manage Players'),
                         onPressed: () {
-                          // TODO: Navigate to Player Management Screen
-                          print('Navigate to Player Management Screen');
+                          // Navigate to the Manage Players Screen, passing the userId
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ManagePlayersScreen(userId: userId)),
+                          );
                         },
                       ),
-                      SizedBox(height: 10), // Place SizedBox directly after the button
+                      SizedBox(height: 10),
                     ],
 
-
+                    if (userRole == 'Coach' || userRole == 'Admin') ...[
                     // Button for Viewing Match Schedule (for all roles)
                     ElevatedButton(
                       child: Text('View Match Schedule'),
@@ -153,7 +158,7 @@ class HomeScreen extends StatelessWidget {
                       },
                     ),
                     SizedBox(height: 10),
-
+                    ],
                     // Button for Adding New Match (only for Coach or Admin)
                     if (userRole == 'Coach' || userRole == 'Admin') ...[ // Use spread operator with if
                       ElevatedButton(
@@ -186,7 +191,7 @@ class HomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => UserBookingsScreen()),
+                          MaterialPageRoute(builder: (context) => UserMatchBookingsScreen()),
                         );
                       },
                     ),

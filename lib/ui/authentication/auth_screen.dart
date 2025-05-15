@@ -81,8 +81,8 @@ class _AuthScreenState extends State<AuthScreen> {
         title: Text(showSignIn ? 'Sign In' : 'Register'),
         actions: <Widget>[
           TextButton.icon(
-            icon: Icon(showSignIn ? Icons.person_add : Icons.login, color: Colors.white),
-            label: Text(showSignIn ? 'Register' : 'Sign In', style: TextStyle(color: Colors.white)),
+            icon: Icon(showSignIn ? Icons.person_add : Icons.login, color: Colors.blue),
+            label: Text(showSignIn ? 'Register' : 'Sign In', style: TextStyle(color: Colors.black)),
             onPressed: () => toggleView(),
           ),
         ],

@@ -1,22 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // For date formatting (ensure intl package is in pubspec.yaml)
+import 'package:intl/intl.dart'; // For date formatting
 import 'package:hockey_union_app/services/auth_service.dart'; // Import AuthService to get user data
 import 'package:hockey_union_app/ui/matches/add_edit_match_screen.dart'; // Import the Add/Edit screen
-// Import TeamProfileScreen if you want to navigate to it from here
-// import 'package:hockey_union_app/ui/teams/team_profile_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth for current user
 
-
-// Update MatchScheduleScreen to accept the userId
 class MatchScheduleScreen extends StatelessWidget {
   final String userId; // Accept the user ID
 
   const MatchScheduleScreen({Key? key, required this.userId}) : super(key: key); // Require userId
 
+  // Function to handle match booking
+  Future<void> _handleMatchBooking(BuildContext context, String matchId, String homeTeamName, String awayTeamName) async {
+    final AuthService _auth = AuthService();
+    final currentUser = _auth.getCurrentUser(); // Get the currently logged-in user
+
+    if (currentUser == null) {
+      // User is not logged in, prompt them to log in
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please sign in to book a spot for a match.')),
+      );
+      // You might want to navigate to the AuthScreen here
+      // Navigator.pushReplacementNamed(context, '/auth');
+      return;
+    }
+
+    // --- Implement the booking logic ---
+    // We'll record the booking in a 'matchBookings' collection
+    final matchBookingsRef = FirebaseFirestore.instance.collection('matchBookings');
+
+    try {
+      // Check if the user has already booked this match (optional but good practice)
+      final existingBooking = await matchBookingsRef
+          .where('userId', isEqualTo: currentUser.uid)
+          .where('matchId', isEqualTo: matchId)
+          .limit(1)
+          .get();
+
+      if (existingBooking.docs.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('You have already booked a spot for this match.')),
+        );
+        return;
+      }
+
+
+      // Create a new booking document
+      await matchBookingsRef.add({ // Use add() to let Firestore generate an ID
+        'userId': currentUser.uid,
+        'matchId': matchId,
+        'bookingDate': FieldValue.serverTimestamp(),
+        'status': 'Confirmed', // Default status (e.g., Confirmed, Attended, Cancelled)
+        'userName': currentUser.email, // Or fetch from user doc if you stored name
+        'matchName': '$homeTeamName vs $awayTeamName', // Store match name for easier query
+        // You might add fields for number of attendees if applicable
+      });
+
+      // Booking successful
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Successfully booked your spot for the match!')),
+      );
+
+      // TODO: Optionally update the match document to track attendees count
+
+    } catch (e) {
+      print("Error during match booking: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to book spot for the match.')),
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final AuthService _auth = AuthService(); // Get AuthService instance
 
+    // Use a FutureBuilder to fetch the current user's role
     return Scaffold(
       appBar: AppBar(
         title: Text('Match Schedule'),
@@ -33,9 +93,8 @@ class MatchScheduleScreen extends StatelessWidget {
           // Handle error or missing user data
           if (userSnapshot.hasError || !userSnapshot.hasData || userSnapshot.data == null) {
             print("Error fetching user data in MatchScheduleScreen: ${userSnapshot.error}");
-            // You might still want to show the schedule but disable editing
-            // For now, let's show an error message, but you could adjust this
-            return Center(child: Text('Error loading user data for permissions.'));
+            // You might still want to show the schedule but disable editing/booking
+            return Center(child: Text('Error loading user data for permissions/booking.'));
           }
 
           // User data fetched, get the role
@@ -71,25 +130,28 @@ class MatchScheduleScreen extends StatelessWidget {
                 itemCount: matches.length,
                 itemBuilder: (context, index) {
                   final match = matches[index].data() as Map<String, dynamic>;
-                  final matchDocId = matches[index].id; // Get the document ID for editing
-
-                  final String homeTeamName = match['homeTeamName'] ?? 'TBD';
-                  final String awayTeamName = match['awayTeamName'] ?? 'TBD';
-                  final String status = match['status'] ?? 'Scheduled';
-                  final int homeScore = match['homeTeamScore'] ?? 0; // Default score to 0
-                  final int awayScore = match['awayTeamScore'] ?? 0; // Default score to 0
+                  final matchDocId = matches[index].id; // Get the document ID for editing/booking
 
                   final Timestamp matchTimestamp = match['matchDate'] ?? Timestamp.now();
                   final DateTime matchDateTime = matchTimestamp.toDate();
                   final formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(matchDateTime); // Format the date
-                  final formattedTime = DateFormat('HH:mm').format(matchDateTime); // Format just the time
 
-                  // Determine if scores should be prominently displayed
-                  final bool showScores = status == 'Completed' || status == 'InProgress';
+                  // Display scores only if the match status indicates completion or in-progress
+                  String scoreDisplay = '';
+                  if (match['status'] == 'Completed' || match['status'] == 'InProgress') {
+                    scoreDisplay = 'Score: ${match['homeTeamScore'] ?? '-'} - ${match['awayTeamScore'] ?? '-'}';
+                  }
+
+                  final String homeTeamName = match['homeTeamName'] ?? 'TBD';
+                  final String awayTeamName = match['awayTeamName'] ?? 'TBD';
+                  final String status = match['status'] ?? 'Scheduled';
+
+                  // Determine if booking is possible (e.g., if match is Scheduled and in the future)
+                  final bool canBook = status == 'Scheduled' && matchDateTime.isAfter(DateTime.now());
+
 
                   return Card(
                     margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    elevation: showScores ? 4.0 : 2.0, // Slightly raise card for live/completed matches
                     child: ListTile(
                       // Conditionally enable onTap based on user role for editing
                       onTap: canEditMatches
@@ -103,58 +165,25 @@ class MatchScheduleScreen extends StatelessWidget {
                       }
                           : null, // Set onTap to null if user cannot edit
 
-                      // Use a Row to place team names/scores and match info side-by-side
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space out the teams/score and info
+                      title: Text('$homeTeamName vs $awayTeamName'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Team Names and Scores
-                          Expanded( // Allow team names/scores to take available space
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '$homeTeamName vs $awayTeamName',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                  overflow: TextOverflow.ellipsis, // Prevent overflow
-                                ),
-                                if (showScores) // Show scores below team names if applicable
-                                  Text(
-                                    '$homeScore - $awayScore',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: status == 'InProgress' ? Colors.red : Colors.black, // Highlight live scores
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 16), // Space between team/score and info
-
-                          // Match Info (Date, Time, Location, Status)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end, // Align info to the right
-                            children: [
-                              Text(formattedDate, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-                              // Text(formattedTime, style: TextStyle(fontSize: 12, color: Colors.grey[700])), // Could show time separately
-                              Text(match['location'] ?? 'TBD', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-                              Text(
-                                status,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: status == 'InProgress' ? Colors.red : Colors.black, // Highlight live status
-                                ),
-                              ),
-                            ],
-                          ),
+                          Text('Date: $formattedDate'),
+                          Text('Location: ${match['location'] ?? 'TBD'}'),
+                          Text('Status: $status'),
+                          if (scoreDisplay.isNotEmpty) Text(scoreDisplay), // Show score if available
                         ],
                       ),
-                      // We removed the subtitle property and integrated its content into the title Row
-                      // We removed the trailing property and integrated its content into the onTap logic or removed it
+                      // Add trailing button for booking if possible
+                      trailing: canBook
+                          ? ElevatedButton(
+                        onPressed: () {
+                          _handleMatchBooking(context, matchDocId, homeTeamName, awayTeamName);
+                        },
+                        child: Text('Book Spot'),
+                      )
+                          : null, // Hide the button if booking is not possible
                     ),
                   );
                 },

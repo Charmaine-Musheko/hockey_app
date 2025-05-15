@@ -3,11 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart'; // For defaultTargetPlatform
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Import local notifications
-import 'package:flutter/material.dart';
-
-import '../ui/events/events_detail.dart'; // Import Material for navigation context (we'll need a NavigatorKey)
+import 'package:flutter/material.dart'; // Import Material for navigation context (we'll need a NavigatorKey)
 
 
+import '../ui/events/events_detail.dart';
+import '../ui/matches/match_detail_screen.dart';
+import '../ui/news/news_detail_screen.dart'; // Import EventDetailScreen
 // TODO: Import NewsDetailScreen if you create one
 // import 'package:hockey_union_app/ui/news/news_detail_screen.dart';
 
@@ -62,9 +63,12 @@ class FcmService {
 
     // --- Local Notifications Setup ---
     // Initialize the plugin for different platforms
-    // Corrected: Replace 'app_icon' with the actual name of your launcher icon drawable resource
+    // IMPORTANT: Replace 'ic_launcher' below with the actual name of your
+    // Android drawable resource file that you want to use as the notification icon.
+    // This is NOT the name of the SVG asset file, but the name of the drawable
+    // resource (e.g., 'my_custom_notification_icon').
     const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher'); // <-- Change this to your icon name (e.g., 'ic_launcher')
+    AndroidInitializationSettings('@mipmap/ic_launcher'); // <-- Use your actual drawable resource name here
 
     // TODO: Add iOS Initialization Settings if needed
     // const DarwinInitializationSettings initializationSettingsDarwin =
@@ -94,6 +98,7 @@ class FcmService {
         handleNotificationTap(notificationResponse.payload);
       },
       // TODO: Implement onDidReceiveBackgroundNotificationResponse for Android 12+
+      // @pragma('vm:entry-point') // Required for background notification response handler
       // onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse, // For background taps (Android 12+)
     );
     print('FlutterLocalNotificationsPlugin initialized.');
@@ -143,6 +148,15 @@ class FcmService {
       // Call the handler function
       handleNotificationTap(message.data['payload']);
     });
+
+    // --- Subscribe to News Topic ---
+    try {
+      await _firebaseMessaging.subscribeToTopic('news');
+      print('Subscribed to news topic.');
+    } catch (e) {
+      print('Error subscribing to news topic: $e');
+    }
+    // --- End Subscribe to News Topic ---
   }
 
   // Helper function to show a local notification
@@ -209,30 +223,15 @@ class FcmService {
     switch (type) {
       case 'match':
       // Navigate to Match Detail Screen
-      // You'll need to import MatchScheduleScreen (or your MatchDetailScreen)
-      // and potentially pass the userId if that screen requires it.
-      // For now, let's navigate to MatchScheduleScreen as a placeholder,
-      // but ideally you'd navigate to a specific Match Detail screen.
-      // Note: MatchScheduleScreen requires userId. You might need to fetch it
-      // or pass it differently if navigating directly from a notification tap.
-      // A dedicated MatchDetailScreen that only needs matchId is better.
-        print('Attempting to navigate to Match Detail (via MatchScheduleScreen placeholder) with ID: $id');
-        // This navigation might require the user to be logged in.
-        // If the app is opened from terminated/background, the Wrapper will handle auth first.
-        // If app is foreground, user is already logged in.
-        // You might need to pass the current userId here if MatchScheduleScreen requires it.
-        // For now, let's skip navigation to MatchScheduleScreen directly as it's complex without userId.
-        // TODO: Implement a dedicated MatchDetailScreen that takes only matchId and fetch data within it.
-        // Example navigation to a hypothetical MatchDetailScreen:
-        // navigatorKey.currentState!.push(MaterialPageRoute(builder: (context) => MatchDetailScreen(matchId: id)));
+        print('Attempting to navigate to Match Detail with ID: $id');
+        // Uncomment and use this line:
+        navigatorKey.currentState!.push(MaterialPageRoute(builder: (context) => MatchDetailScreen(matchId: id)));
         break;
 
       case 'news':
-      // TODO: Navigate to News Detail Screen (if you create one)
-      // Requires importing the screen
-      // Example navigation:
-      // navigatorKey.currentState!.push(MaterialPageRoute(builder: (context) => NewsDetailScreen(newsId: id)));
+      // Navigate to News Detail Screen
         print('Attempting to navigate to News Detail with ID: $id');
+        navigatorKey.currentState!.push(MaterialPageRoute(builder: (context) => NewsDetailScreen(newsId: id))); // Uncomment and use this line
         break;
 
       case 'event':
