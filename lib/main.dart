@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hockey_union_app/services/auth_service.dart';
 import 'package:hockey_union_app/services/fcm_service.dart';
+import 'package:hockey_union_app/splash_screen.dart';
 import 'package:hockey_union_app/ui/authentication/auth_screen.dart';
 import 'package:hockey_union_app/ui/home_screen.dart';
 import 'package:hockey_union_app/wrapper.dart';
@@ -84,7 +85,7 @@ class HockeyUnionApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       navigatorKey: FcmService.navigatorKey, // Assign the GlobalKey here
-      home: Wrapper(),
+      home: SplashScreen(),
     );
   }
 }

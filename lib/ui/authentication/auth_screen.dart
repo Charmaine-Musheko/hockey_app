@@ -17,6 +17,9 @@ class _AuthScreenState extends State<AuthScreen> {
   bool showSignIn = true; // Toggle between Sign In and Register
   bool _isLoading = false; // To show loading for auth operations
 
+  // Define a consistent navy blue color
+  final Color navyBlue = Color(0xFF000080); // A standard navy blue hex code
+
   void toggleView() {
     setState(() => showSignIn = !showSignIn);
     _formKey.currentState?.reset();
@@ -79,10 +82,12 @@ class _AuthScreenState extends State<AuthScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(showSignIn ? 'Sign In' : 'Register'),
+        backgroundColor: navyBlue, // Set AppBar background to navy blue
+        foregroundColor: Colors.white, // Set text/icon color to white for contrast
         actions: <Widget>[
           TextButton.icon(
-            icon: Icon(showSignIn ? Icons.person_add : Icons.login, color: Colors.blue),
-            label: Text(showSignIn ? 'Register' : 'Sign In', style: TextStyle(color: Colors.black)),
+            icon: Icon(showSignIn ? Icons.person_add : Icons.login, color: Colors.white), // White icon
+            label: Text(showSignIn ? 'Register' : 'Sign In', style: TextStyle(color: Colors.white)), // White text
             onPressed: () => toggleView(),
           ),
         ],
@@ -91,32 +96,83 @@ class _AuthScreenState extends State<AuthScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator()) // Show loading indicator when _isLoading is true
           : Container(
-        padding: EdgeInsets.symmetric(vertical: 20.0, horizontal: 50.0),
+        padding: EdgeInsets.symmetric(vertical: 30.0, horizontal: 24.0), // Increased padding
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center, // Center the form vertically
+            crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch form fields horizontally
             children: <Widget>[
+              // Add a logo or title here for better visual identity
+              Center(
+                child: Icon(
+                  Icons.sports_hockey, // Placeholder icon
+                  size: 80,
+                  color: navyBlue,
+                ),
+              ),
+              SizedBox(height: 20),
+              Center(
+                child: Text(
+                  showSignIn ? 'Welcome Back!' : 'Create Your Account',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: navyBlue,
+                  ),
+                ),
+              ),
+              SizedBox(height: 30),
+
               TextFormField(
-                decoration: InputDecoration(labelText: 'Email'),
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email, color: navyBlue), // Navy blue icon
+                  border: OutlineInputBorder( // Add a border
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  focusedBorder: OutlineInputBorder( // Navy blue border when focused
+                    borderSide: BorderSide(color: navyBlue, width: 2.0),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  labelStyle: TextStyle(color: navyBlue), // Navy blue label text
+                ),
                 validator: (val) => val!.isEmpty ? 'Enter an email' : null,
                 onChanged: (val) {
                   setState(() => email = val);
                 },
               ),
-              SizedBox(height: 20.0),
+              SizedBox(height: 16.0), // Reduced space between text fields
               TextFormField(
-                decoration: InputDecoration(labelText: 'Password'),
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: Icon(Icons.lock, color: navyBlue), // Navy blue icon
+                  border: OutlineInputBorder( // Add a border
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  focusedBorder: OutlineInputBorder( // Navy blue border when focused
+                    borderSide: BorderSide(color: navyBlue, width: 2.0),
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  labelStyle: TextStyle(color: navyBlue), // Navy blue label text
+                ),
                 obscureText: true,
-                // Keep the basic validator here, but Firebase Auth provides the ultimate check
                 validator: (val) => val!.length < 6 ? 'Password must be at least 6 characters' : null,
                 onChanged: (val) {
                   setState(() => password = val);
                 },
               ),
-              SizedBox(height: 20.0),
+              SizedBox(height: 24.0), // Increased space before button
               ElevatedButton(
-                child: Text(showSignIn ? 'Sign In' : 'Register'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: navyBlue, // Navy blue background
+                  foregroundColor: Colors.white, // White text
+                  padding: EdgeInsets.symmetric(vertical: 15.0), // Button padding
+                  shape: RoundedRectangleBorder( // Rounded corners
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
+                child: Text(showSignIn ? 'Sign In' : 'Register', style: TextStyle(fontSize: 18)),
                 onPressed: () async {
                   // Validate the form fields
                   if (_formKey.currentState!.validate()) {
@@ -174,7 +230,7 @@ class _AuthScreenState extends State<AuthScreen> {
               SizedBox(height: 12.0),
               // Add the Forgot Password button/text
               TextButton(
-                child: Text('Forgot Password?'),
+                child: Text('Forgot Password?', style: TextStyle(color: navyBlue)), // Navy blue text
                 onPressed: showSignIn ? _forgotPassword : null, // Only enable if in Sign In view
               ),
               SizedBox(height: 12.0),
