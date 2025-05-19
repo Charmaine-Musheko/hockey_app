@@ -161,9 +161,3 @@ Open a Pull Request.
 License
 Specify your project's license here (e.g., MIT, Apache 2.0)
 
-Contact
-Student Name: Charmaine Musheko
-
-Student Number: 219148872
-
-Add any other contact information or links (e.g., GitHub profile)
