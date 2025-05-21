@@ -1,18 +1,24 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth for current user
 
 class PlayerRegistrationScreen extends StatefulWidget {
-  // Optional: Pass a player document ID if editing an existing player
+  // Optional: Pass playerId if editing an existing player.
+  // This playerId will now be the user's UID.
   final String? playerId;
 
-  // Remove teamId and teamName parameters as the screen will fetch teams
-  // final String teamId;
-  // final String teamName;
+  // teamId and teamName are now optional in the constructor.
+  // They are used for initial selection when adding a new player.
+  // When editing, the screen will fetch the player's team data.
+  final String? teamId;
+  final String? teamName;
 
-  const PlayerRegistrationScreen({Key? key, this.playerId}) : super(key: key);
-  // Removed required teamId and teamName from constructor
-  // const PlayerRegistrationScreen({Key? key, required this.teamId, required this.teamName, this.playerId}) : super(key: key);
-
+  PlayerRegistrationScreen({
+    Key? key,
+    this.teamId, // Made optional
+    this.teamName, // Made optional
+    this.playerId,
+  }) : super(key: key);
 
   @override
   _PlayerRegistrationScreenState createState() => _PlayerRegistrationScreenState();
@@ -20,104 +26,138 @@ class PlayerRegistrationScreen extends StatefulWidget {
 
 class _PlayerRegistrationScreenState extends State<PlayerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _playerNameController = TextEditingController();
   final TextEditingController _positionController = TextEditingController();
-  final TextEditingController _jerseyNumberController = TextEditingController();
+  final TextEditingController _goalsController = TextEditingController();
+  final TextEditingController _assistsController = TextEditingController();
+  final TextEditingController _gamesPlayedController = TextEditingController();
+  final TextEditingController _achievementsController = TextEditingController();
+  final TextEditingController _jerseyNumberController = TextEditingController(); // Added jersey number controller
 
-  String? _selectedTeamId; // To store the selected team's document ID
-  List<DropdownMenuItem<String>> _teamDropdownItems = []; // List to hold team dropdown items
-  Map<String, String> _teamNames = {}; // Map to store team IDs and names
+  String? _selectedUserId; // To store the UID of the selected user for new registrations
+  List<DropdownMenuItem<String>> _userDropdownItems = []; // List to hold user dropdown items
+  Map<String, Map<String, dynamic>> _userMap = {}; // Map to store user data by UID
 
-  bool _isLoading = false; // To show a loading indicator
-  bool _isFetchingTeams = true; // To indicate if teams are being fetched
+  String? _currentTeamId; // Internal state for the team ID of the player being registered/edited
+  String? _currentTeamName; // Internal state for the team name of the player being registered/edited
+
+  bool _isLoading = false; // To show a loading indicator for saving/loading player
+  bool _isFetchingUsers = true; // To indicate if users are being fetched
   bool _isEditing = false; // To know if we are editing or adding
 
   @override
   void initState() {
     super.initState();
-    _fetchTeams(); // Fetch teams when the screen initializes
+    _isEditing = widget.playerId != null;
 
-    if (widget.playerId != null) {
-      _isEditing = true; // Set editing mode
-      _loadPlayerData(widget.playerId!); // Load player data if editing
+    // If adding a new player, use the teamId and teamName passed from the widget
+    if (!_isEditing) {
+      _currentTeamId = widget.teamId;
+      _currentTeamName = widget.teamName;
     }
+
+    _fetchUsers(); // Fetch users (for new player selection)
+    // No need to fetch all teams if we're always getting teamId/Name from widget or player doc
+    // _fetchTeams(); // Removed as per user request
   }
 
   @override
   void dispose() {
-    _playerNameController.dispose();
     _positionController.dispose();
-    _jerseyNumberController.dispose();
+    _goalsController.dispose();
+    _assistsController.dispose();
+    _gamesPlayedController.dispose();
+    _achievementsController.dispose();
+    _jerseyNumberController.dispose(); // Dispose jersey number controller
     super.dispose();
   }
 
-  // Function to fetch the list of teams from Firestore
-  Future<void> _fetchTeams() async {
+  // Function to fetch the list of users from Firestore (only 'Player' role)
+  Future<void> _fetchUsers() async {
+    setState(() {
+      _isFetchingUsers = true;
+    });
     try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('teams').orderBy('teamName').get();
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'Player') // Filter by 'Player' role
+          .get();
       List<DropdownMenuItem<String>> items = [];
-      Map<String, String> names = {};
+      Map<String, Map<String, dynamic>> usersData = {};
 
       for (var doc in snapshot.docs) {
-        final teamData = doc.data() as Map<String, dynamic>;
-        final teamId = doc.id;
-        final teamName = teamData['teamName'] ?? 'Unnamed Team';
+        final userData = doc.data() as Map<String, dynamic>;
+        final String uid = doc.id;
+        final String role = userData['role'] ?? 'Fan';
+        final String firstName = userData['firstName'] ?? '';
+        final String lastName = userData['lastName'] ?? '';
+        final String email = userData['email'] ?? 'No Email';
+
+        String displayName = '';
+        if (firstName.isNotEmpty && lastName.isNotEmpty) {
+          displayName = '$firstName $lastName ($role)';
+        } else if (firstName.isNotEmpty) {
+          displayName = '$firstName ($role)';
+        } else {
+          displayName = '$email ($role)';
+        }
+
         items.add(DropdownMenuItem(
-          value: teamId,
-          child: Text(teamName),
+          value: uid,
+          child: Text(displayName),
         ));
-        names[teamId] = teamName;
+        usersData[uid] = userData; // Store full user data
       }
 
       setState(() {
-        _teamDropdownItems = items;
-        _teamNames = names;
-        _isFetchingTeams = false; // Finished fetching teams
-        // If editing and team data is loaded, set the selected team
-        if (_isEditing && _selectedTeamId != null && _teamNames.containsKey(_selectedTeamId)) {
-          // The loadPlayerData function will set _selectedTeamId
-          // We just need to make sure the dropdown updates after teams are fetched
-          // No explicit action needed here if loadPlayerData runs after _fetchTeams
-        } else if (!_isEditing && _teamDropdownItems.isNotEmpty) {
-          // For adding, automatically select the first team if available
-          _selectedTeamId = _teamDropdownItems.first.value;
+        _userDropdownItems = items;
+        _userMap = usersData;
+        _isFetchingUsers = false;
+
+        // If adding and no user selected, pre-select the first user if available
+        if (!_isEditing && _selectedUserId == null && _userDropdownItems.isNotEmpty) {
+          _selectedUserId = _userDropdownItems.first.value;
+        }
+        // If editing, load player data after users are fetched
+        else if (_isEditing) {
+          _loadPlayerData(widget.playerId!);
         }
       });
 
     } catch (e) {
-      print("Error fetching teams: $e");
+      print("Error fetching users: $e");
       setState(() {
-        _isFetchingTeams = false;
-        // Optionally show an error message to the user
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load teams.')));
+        _isFetchingUsers = false;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load users.')));
       });
     }
   }
 
-  // Function to load data for editing
+  // Function to load data for editing an existing player profile
   Future<void> _loadPlayerData(String playerId) async {
     setState(() {
       _isLoading = true;
     });
     try {
+      // The player document ID is now the user's UID
       DocumentSnapshot doc = await FirebaseFirestore.instance.collection('players').doc(playerId).get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
-        _playerNameController.text = data['playerName'] ?? '';
         _positionController.text = data['position'] ?? '';
-        _jerseyNumberController.text = data['jerseyNumber']?.toString() ?? '';
-        _selectedTeamId = data['teamId']; // Load the player's team ID
+        _jerseyNumberController.text = (data['jerseyNumber']?.toString() ?? ''); // Load jersey number
+        _goalsController.text = (data['goals']?.toString() ?? '0');
+        _assistsController.text = (data['assists']?.toString() ?? '0');
+        _gamesPlayedController.text = (data['gamesPlayed']?.toString() ?? '0');
+        final List<dynamic> achievementsList = data['achievements'] is List ? data['achievements'] : [];
+        _achievementsController.text = achievementsList.join(', ');
 
-        // Ensure the dropdown is updated after teams are fetched
-        if (!_isFetchingTeams && _teamNames.containsKey(_selectedTeamId)) {
-          // If teams are already fetched, set the selected team immediately
-          setState(() {}); // Trigger rebuild to update dropdown
-        }
+        // Set the selected user and team from player data
+        _selectedUserId = data['userId'];
+        _currentTeamId = data['teamId'];
+        _currentTeamName = data['teamName'];
 
       } else {
-        // Handle case where playerId was provided but document doesn't exist
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Player not found for editing.')));
-        Navigator.pop(context); // Go back if player doesn't exist
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Player profile not found for editing.')));
+        Navigator.pop(context);
       }
     } catch (e) {
       print("Error loading player data: $e");
@@ -129,49 +169,61 @@ class _PlayerRegistrationScreenState extends State<PlayerRegistrationScreen> {
     }
   }
 
-
   // Function to save or update player data
   Future<void> _savePlayer() async {
     if (_formKey.currentState!.validate()) {
-      // Ensure a team is selected
-      if (_selectedTeamId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select a team.')));
+      if (_selectedUserId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select a user to register as a player.')));
         return;
       }
+      // Ensure team context is available for both new and edited players
+      if (_currentTeamId == null || _currentTeamName == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Team context is missing. Please ensure the player has an associated team.')));
+        return;
+      }
+
 
       setState(() {
         _isLoading = true;
       });
 
-      // Prepare data map
+      final selectedUserData = _userMap[_selectedUserId!];
+      final String playerName = '${selectedUserData!['firstName'] ?? ''} ${selectedUserData['lastName'] ?? ''}'.trim();
+      final String playerEmail = selectedUserData['email'] ?? '';
+
+      // Prepare data map for player profile
       Map<String, dynamic> playerData = {
-        'playerName': _playerNameController.text.trim(),
+        'userId': _selectedUserId, // Link to the user's UID
+        'playerName': playerName.isEmpty ? playerEmail : playerName, // Use name if available, else email
         'position': _positionController.text.trim(),
-        'jerseyNumber': int.tryParse(_jerseyNumberController.text.trim()) ?? null, // Save as int, null if parsing fails
-        'teamId': _selectedTeamId, // Save the selected team ID
-        'teamName': _teamNames[_selectedTeamId], // Optionally save team name for easier display later
-        'timestamp': FieldValue.serverTimestamp(), // For ordering in lists
+        'jerseyNumber': int.tryParse(_jerseyNumberController.text.trim()) ?? null,
+        'teamId': _currentTeamId, // Link to the current team
+        'teamName': _currentTeamName, // Store current team name for easier display
+        'goals': int.tryParse(_goalsController.text.trim()) ?? 0,
+        'assists': int.tryParse(_assistsController.text.trim()) ?? 0,
+        'gamesPlayed': int.tryParse(_gamesPlayedController.text.trim()) ?? 0,
+        'achievements': _achievementsController.text.trim().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+        'timestamp': FieldValue.serverTimestamp(), // Update timestamp on save
       };
 
       try {
-        if (widget.playerId == null) {
-          // Add new player
-          await FirebaseFirestore.instance.collection('players').add(playerData);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Player registered successfully!')));
-        } else {
-          // Update existing player
-          await FirebaseFirestore.instance.collection('players').doc(widget.playerId).update(playerData);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Player updated successfully!')));
-        }
-        // Clear form fields only if adding
+        // Use the selected user's UID as the document ID for the player profile
+        await FirebaseFirestore.instance.collection('players').doc(_selectedUserId).set(playerData, SetOptions(merge: true));
+
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Player profile saved successfully!')));
+
         if (!_isEditing) {
-          _playerNameController.clear();
           _positionController.clear();
           _jerseyNumberController.clear();
-          // Keep selected team or reset based on preference
-          // setState(() { _selectedTeamId = null; }); // Uncomment to reset selected team
+          _goalsController.clear();
+          _assistsController.clear();
+          _gamesPlayedController.clear();
+          _achievementsController.clear();
+          setState(() {
+            _selectedUserId = null; // Reset selected user
+            // Keep team context for potential next player registration for the same team
+          });
         } else {
-          // If editing, pop the screen after successful update
           Navigator.pop(context);
         }
 
@@ -188,39 +240,59 @@ class _PlayerRegistrationScreenState extends State<PlayerRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String appBarTitle = _isEditing
+        ? 'Edit Player Profile'
+        : 'Register Player for ${_currentTeamName ?? 'Team'}'; // Use _currentTeamName for display
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.playerId == null ? 'Register New Player' : 'Edit Player'),
+        title: Text(appBarTitle),
       ),
-      body: _isLoading || _isFetchingTeams // Show loading if saving or fetching teams
+      body: _isLoading || _isFetchingUsers
           ? Center(child: CircularProgressIndicator())
           : Padding(
         padding: EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: ListView( // Use ListView for scrolling if content overflows
+          child: ListView(
             children: [
-              // Team Selection Dropdown
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(labelText: 'Select Team'),
-                value: _selectedTeamId, // Current selected value
-                items: _teamDropdownItems, // List of dropdown items
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedTeamId = newValue;
-                  });
-                },
-                validator: (val) => val == null ? 'Please select a team' : null,
-                // Disable dropdown if no teams are available
-                // enabled: _teamDropdownItems.isNotEmpty, // This might be too restrictive if fetching failed
+              // User Selection Dropdown (only for adding new player)
+              if (!_isEditing) ...[
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(labelText: 'Select User (Player Role)'),
+                  value: _selectedUserId,
+                  items: _userDropdownItems,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedUserId = newValue;
+                    });
+                  },
+                  validator: (val) => val == null ? 'Please select a user' : null,
+                  hint: Text('Select a user with Player role'),
+                ),
+                SizedBox(height: 16.0),
+              ],
+              // Display selected user's name if editing
+              if (_isEditing && _selectedUserId != null && _userMap.containsKey(_selectedUserId))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'Player: ${_userMap[_selectedUserId]!['firstName'] ?? ''} ${_userMap[_selectedUserId]!['lastName'] ?? ''} (${_userMap[_selectedUserId]!['email']})',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              SizedBox(height: 16.0),
+
+              // Display Team Name (auto-populated)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  'Team: ${_currentTeamName ?? 'Loading Team...'}',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
               SizedBox(height: 16.0),
-              TextFormField(
-                controller: _playerNameController,
-                decoration: InputDecoration(labelText: 'Player Name'),
-                validator: (val) => val!.isEmpty ? 'Enter player name' : null,
-              ),
-              SizedBox(height: 16.0),
+
               TextFormField(
                 controller: _positionController,
                 decoration: InputDecoration(labelText: 'Position (e.g., Forward, Defense, Goalie)'),
@@ -233,15 +305,75 @@ class _PlayerRegistrationScreenState extends State<PlayerRegistrationScreen> {
                 keyboardType: TextInputType.number,
                 validator: (val) {
                   if (val != null && val.isNotEmpty && int.tryParse(val) == null) {
-                    return 'Enter a valid number'; // Ensure it's a number if entered
+                    return 'Enter a valid number';
                   }
-                  return null; // No error or optional field
+                  return null;
                 },
               ),
-              // TODO: Add fields for player stats, achievements etc. later
               SizedBox(height: 24.0),
+
+              // --- Stats Section ---
+              Text(
+                'Stats',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: _goalsController,
+                decoration: InputDecoration(labelText: 'Goals'),
+                keyboardType: TextInputType.number,
+                validator: (val) {
+                  if (val != null && val.isNotEmpty && int.tryParse(val) == null) {
+                    return 'Enter a valid number';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: _assistsController,
+                decoration: InputDecoration(labelText: 'Assists'),
+                keyboardType: TextInputType.number,
+                validator: (val) {
+                  if (val != null && val.isNotEmpty && int.tryParse(val) == null) {
+                    return 'Enter a valid number';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: _gamesPlayedController,
+                decoration: InputDecoration(labelText: 'Games Played'),
+                keyboardType: TextInputType.number,
+                validator: (val) {
+                  if (val != null && val.isNotEmpty && int.tryParse(val) == null) {
+                    return 'Enter a valid number';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 24.0),
+
+              // --- Achievements Section ---
+              Text(
+                'Achievements',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: _achievementsController,
+                decoration: InputDecoration(
+                  labelText: 'Achievements (comma-separated)',
+                  hintText: 'e.g., MVP 2023, All-Star Team',
+                ),
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+              ),
+              SizedBox(height: 24.0),
+
               ElevatedButton(
-                child: Text(widget.playerId == null ? 'Register Player' : 'Update Player'),
+                child: Text(_isEditing ? 'Update Player' : 'Register Player'),
                 onPressed: _savePlayer,
               ),
             ],

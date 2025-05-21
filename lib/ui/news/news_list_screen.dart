@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:hockey_union_app/services/auth_service.dart'; // Import AuthService to get user data
-import 'add_news.dart'; // Import the Add News screen
+import 'package:hockey_union_app/ui/news/news_detail_screen.dart';
+
+import 'add_news.dart'; // Import the News Detail screen
 
 // Update NewsListScreen to accept the userId
 class NewsListScreen extends StatelessWidget {
@@ -72,18 +74,31 @@ class NewsListScreen extends StatelessWidget {
                   itemCount: newsItems.length,
                   itemBuilder: (context, index) {
                     final news = newsItems[index].data() as Map<String, dynamic>;
+                    final newsDocId = newsItems[index].id; // Get the document ID for navigation
 
                     final Timestamp publishTimestamp = news['publishDate'] ?? Timestamp.now();
                     final DateTime publishDateTime = publishTimestamp.toDate();
                     final formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(publishDateTime); // Format the date
+                    final String? imageUrl = news['imageUrl']; // Get the image URL
 
                     return Card(
                       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                       child: ListTile(
-                        // Optional: Display an image if imageUrl exists
-                        // leading: news['imageUrl'] != null && news['imageUrl'].isNotEmpty
-                        //     ? Image.network(news['imageUrl'], width: 50, height: 50, fit: BoxFit.cover)
-                        //     : null,
+                        // Display an image if imageUrl exists
+                        leading: imageUrl != null && imageUrl.isNotEmpty
+                            ? Image.network(
+                          imageUrl,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 60,
+                            height: 60,
+                            color: Colors.grey[300],
+                            child: Icon(Icons.broken_image, size: 30, color: Colors.grey[600]),
+                          ),
+                        )
+                            : null, // No leading widget if no image
                         title: Text(
                           news['title'] ?? 'No Title',
                           style: TextStyle(fontWeight: FontWeight.bold),
@@ -97,15 +112,14 @@ class NewsListScreen extends StatelessWidget {
                           ],
                         ),
                         isThreeLine: true, // Allows the subtitle to use more lines
-                        // You can add onTap here to navigate to a full News Detail screen later
-                        // onTap: () {
-                        //   Navigator.push(
-                        //     context,
-                        //     MaterialPageRoute(
-                        //       builder: (context) => NewsDetailScreen(newsId: newsItems[index].id),
-                        //     ),
-                        //   );
-                        // },
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => NewsDetailScreen(newsId: newsDocId),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },

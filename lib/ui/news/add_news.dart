@@ -10,6 +10,7 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
+  final TextEditingController _imageUrlController = TextEditingController(); // Added image URL controller
 
   bool _isLoading = false; // To show a loading indicator
 
@@ -17,6 +18,7 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _imageUrlController.dispose(); // Dispose image URL controller
     super.dispose();
   }
 
@@ -31,6 +33,7 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
       Map<String, dynamic> newsData = {
         'title': _titleController.text.trim(),
         'content': _contentController.text.trim(),
+        'imageUrl': _imageUrlController.text.trim(), // Save the image URL
         'publishDate': FieldValue.serverTimestamp(), // Use server timestamp for consistent date
         // Optional: Add authorId if you want to link news to a user
         // 'authorId': 'current_user_id', // You would get the current user's ID here
@@ -45,6 +48,7 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
         // Clear form fields after successful save
         _titleController.clear();
         _contentController.clear();
+        _imageUrlController.clear(); // Clear image URL field
 
         // Optionally navigate back after saving
         // Navigator.pop(context);
@@ -86,6 +90,13 @@ class _AddNewsScreenState extends State<AddNewsScreen> {
                 validator: (val) => val!.isEmpty ? 'Enter content for the announcement' : null,
                 maxLines: 8, // Allow multiple lines for content
                 keyboardType: TextInputType.multiline,
+              ),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: _imageUrlController,
+                decoration: InputDecoration(labelText: 'Image URL (Optional)'),
+                keyboardType: TextInputType.url,
+                // No validator needed if it's optional
               ),
               SizedBox(height: 24.0),
               ElevatedButton(

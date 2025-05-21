@@ -19,7 +19,6 @@ class NewsDetailScreen extends StatelessWidget {
         builder: (context, snapshot) {
           // Show loading indicator
           if (snapshot.connectionState == ConnectionState.waiting) {
-            // Corrected: Typo fixed from CircularCircularProgressIndicator
             return Center(child: CircularProgressIndicator());
           }
 
@@ -38,6 +37,7 @@ class NewsDetailScreen extends StatelessWidget {
           final newsData = snapshot.data!.data() as Map<String, dynamic>;
           final title = newsData['title'] ?? 'No Title';
           final content = newsData['content'] ?? 'No content available.';
+          final String? imageUrl = newsData['imageUrl']; // Get the image URL
 
           final Timestamp publishTimestamp = newsData['publishDate'] ?? Timestamp.now();
           final DateTime publishDateTime = publishTimestamp.toDate();
@@ -55,6 +55,25 @@ class NewsDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Display image if imageUrl exists
+                if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                  ClipRRect( // Clip the image with rounded corners
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: Image.network(
+                      imageUrl,
+                      width: double.infinity, // Make image fill width
+                      height: 200, // Set a fixed height for consistency
+                      fit: BoxFit.cover, // Cover the area, cropping if necessary
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: double.infinity,
+                        height: 200,
+                        color: Colors.grey[300],
+                        child: Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey[600])),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                ],
                 Text(
                   title,
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -69,11 +88,6 @@ class NewsDetailScreen extends StatelessWidget {
                   content,
                   style: TextStyle(fontSize: 16),
                 ),
-                // Optional: Display image if imageUrl exists
-                // if (newsData['imageUrl'] != null && newsData['imageUrl'].isNotEmpty) ...[
-                //   SizedBox(height: 16),
-                //   Image.network(newsData['imageUrl']),
-                // ],
               ],
             ),
           );

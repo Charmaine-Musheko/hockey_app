@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PlayerProfileScreen extends StatelessWidget {
-  final String playerId; // The ID of the player to display
+  final String playerId; // The ID of the player to display (which is now the user's UID)
 
   const PlayerProfileScreen({Key? key, required this.playerId}) : super(key: key);
 
@@ -13,7 +13,7 @@ class PlayerProfileScreen extends StatelessWidget {
         title: Text('Player Profile'), // Will update with player name once loaded
       ),
       body: FutureBuilder<DocumentSnapshot>(
-        // Fetch the specific player document from Firestore
+        // Fetch the specific player document from Firestore using the user's UID as the document ID
         future: FirebaseFirestore.instance.collection('players').doc(playerId).get(),
         builder: (context, snapshot) {
           // Show loading indicator
@@ -27,9 +27,9 @@ class PlayerProfileScreen extends StatelessWidget {
             return Center(child: Text('Error loading player profile.'));
           }
 
-          // Handle case where document doesn't exist
+          // Handle case where document doesn't exist (e.g., no player profile created for this user ID)
           if (!snapshot.hasData || !snapshot.data!.exists) {
-            return Center(child: Text('Player not found.'));
+            return Center(child: Text('Player profile not found.'));
           }
 
           // Player data is loaded
@@ -37,13 +37,13 @@ class PlayerProfileScreen extends StatelessWidget {
           final playerName = playerData['playerName'] ?? 'Unknown Player';
           final position = playerData['position'] ?? 'N/A';
           final teamName = playerData['teamName'] ?? 'N/A'; // Assuming teamName is stored with player
+          final int jerseyNumber = playerData['jerseyNumber'] ?? 'N/A'; // Fetch jersey number
 
-          // --- New fields for Stats and Achievements (Add these to Firestore documents) ---
-          final int goals = playerData['goals'] ?? 0; // Example stat: Goals
-          final int assists = playerData['assists'] ?? 0; // Example stat: Assists
-          final int gamesPlayed = playerData['gamesPlayed'] ?? 0; // Example stat: Games Played
-          // Ensure 'achievements' is stored as a List in Firestore
-          final List<dynamic> achievementsList = playerData['achievements'] is List ? playerData['achievements'] : []; // Safely cast to List
+          // --- New fields for Stats and Achievements ---
+          final int goals = playerData['goals'] ?? 0;
+          final int assists = playerData['assists'] ?? 0;
+          final int gamesPlayed = playerData['gamesPlayed'] ?? 0;
+          final List<dynamic> achievementsList = playerData['achievements'] is List ? playerData['achievements'] : [];
 
 
           // Update AppBar title once data is loaded (Note for StatelessWidget)
@@ -56,7 +56,7 @@ class PlayerProfileScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [ // Start of the Column children list
+              children: [
                 Text(
                   playerName,
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -65,11 +65,8 @@ class PlayerProfileScreen extends StatelessWidget {
                 Text('Team: $teamName', style: TextStyle(fontSize: 18)),
                 SizedBox(height: 8),
                 Text('Position: $position', style: TextStyle(fontSize: 18)),
-                // Add other basic details here (e.g., age, jerseyNumber if you add them)
-                // SizedBox(height: 8),
-                // Text('Age: ${playerData['age'] ?? 'N/A'}', style: TextStyle(fontSize: 18)),
-                // SizedBox(height: 8),
-                // Text('Jersey #: ${playerData['jerseyNumber'] ?? 'N/A'}', style: TextStyle(fontSize: 18)),
+                SizedBox(height: 8),
+                Text('Jersey #: ${jerseyNumber == 'N/A' ? 'N/A' : jerseyNumber.toString()}', style: TextStyle(fontSize: 18)),
 
 
                 SizedBox(height: 24),
@@ -79,13 +76,11 @@ class PlayerProfileScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 16),
-                // Displaying the new stats fields
                 Text('Games Played: $gamesPlayed', style: TextStyle(fontSize: 16)),
                 SizedBox(height: 8),
                 Text('Goals: $goals', style: TextStyle(fontSize: 16)),
                 SizedBox(height: 8),
                 Text('Assists: $assists', style: TextStyle(fontSize: 16)),
-                // Add more stats fields here as you add them to Firestore
 
 
                 SizedBox(height: 24),
@@ -95,20 +90,17 @@ class PlayerProfileScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 16),
-                // Displaying the list of achievements conditionally
-                if (achievementsList.isEmpty) // If list is empty, add this Text widget
+                if (achievementsList.isEmpty)
                   Text('No achievements listed yet.', style: TextStyle(fontStyle: FontStyle.italic)),
-                // No 'else' keyword here. If the list is not empty, the first 'if' is false,
-                // and we proceed to the next widget in the Column's children list.
-                if (achievementsList.isNotEmpty) // If list is NOT empty, add this Column widget
-                  Column( // Use a Column to list achievements
+                if (achievementsList.isNotEmpty)
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: achievementsList.map<Widget>((achievement) => Padding( // Explicitly cast map result to Widget
+                    children: achievementsList.map<Widget>((achievement) => Padding(
                       padding: const EdgeInsets.only(bottom: 4.0),
                       child: Text('- $achievement', style: TextStyle(fontSize: 16)),
-                    )).toList(), // Convert the Iterable to a List<Widget>
+                    )).toList(),
                   ),
-              ], // End of the Column children list
+              ],
             ),
           );
         },

@@ -86,8 +86,10 @@ class TeamListScreen extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  // Corrected: Removed teamId and teamName parameters
-                                  builder: (context) => PlayerRegistrationScreen(),
+                                  builder: (context) => PlayerRegistrationScreen(
+                                    teamId: teamDocId, // Pass the team ID
+                                    teamName: team['teamName'] ?? 'Unknown Team', // Pass the team name
+                                  ),
                                 ),
                               );
                             },

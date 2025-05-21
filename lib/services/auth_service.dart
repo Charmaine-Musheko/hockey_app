@@ -39,7 +39,8 @@ class AuthService {
   }
 
   // Sign up with email and password AND create user document in Firestore
-  Future<User?> signUpWithEmailAndPassword(String email, String password) async {
+  // Updated to accept firstName, lastName, desiredRole, and roleReason
+  Future<User?> signUpWithEmailAndPassword(String email, String password, String firstName, String lastName, String desiredRole, String roleReason) async {
     try {
       UserCredential result = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email, password: password);
@@ -50,7 +51,11 @@ class AuthService {
         await _firestore.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email,
-          'role': 'Fan', // Assign a default role, e.g., 'Fan'
+          'firstName': firstName, // Save first name
+          'lastName': lastName,   // Save last name
+          'role': 'Fan',           // Default to 'Fan' role, admin approval needed for others
+          'desiredRole': desiredRole, // Save desired role
+          'roleReason': roleReason, // Save reason for desired role
           'createdAt': FieldValue.serverTimestamp(),
         });
 
@@ -76,8 +81,17 @@ class AuthService {
       if (doc.exists) {
         return doc.data() as Map<String, dynamic>?;
       } else {
-        print('User document not found for uid: $uid');
-        return null;
+        print('User document not found for uid: $uid on first attempt. Retrying...');
+        // Add a small delay and retry once
+        await Future.delayed(Duration(seconds: 1)); // Wait for 1 second
+        doc = await _firestore.collection('users').doc(uid).get();
+        if (doc.exists) {
+          print('User document found on retry for uid: $uid');
+          return doc.data() as Map<String, dynamic>?;
+        } else {
+          print('User document still not found for uid: $uid after retry.');
+          return null;
+        }
       }
     } catch (e) {
       print("Error getting user data: ${e.toString()}");

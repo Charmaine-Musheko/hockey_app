@@ -4,6 +4,7 @@ import 'package:intl/intl.dart'; // For date formatting
 import 'package:hockey_union_app/services/auth_service.dart'; // Import AuthService to get user data
 import 'package:hockey_union_app/ui/matches/add_edit_match_screen.dart'; // Import the Add/Edit screen
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth for current user
+import 'package:hockey_union_app/utils/app_colors.dart'; // Import your new AppColors
 
 class MatchScheduleScreen extends StatelessWidget {
   final String userId; // Accept the user ID
@@ -12,16 +13,13 @@ class MatchScheduleScreen extends StatelessWidget {
 
   // Function to handle match booking
   Future<void> _handleMatchBooking(BuildContext context, String matchId, String homeTeamName, String awayTeamName) async {
-    final AuthService _auth = AuthService();
-    final currentUser = _auth.getCurrentUser(); // Get the currently logged-in user
+    final currentUser = FirebaseAuth.instance.currentUser; // Get the currently logged-in user
 
     if (currentUser == null) {
       // User is not logged in, prompt them to log in
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please sign in to book a spot for a match.')),
       );
-      // You might want to navigate to the AuthScreen here
-      // Navigator.pushReplacementNamed(context, '/auth');
       return;
     }
 
@@ -76,10 +74,13 @@ class MatchScheduleScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final AuthService _auth = AuthService(); // Get AuthService instance
 
-    // Use a FutureBuilder to fetch the current user's role
     return Scaffold(
+      backgroundColor: AppColors.primaryGreen, // Dark green background
       appBar: AppBar(
         title: Text('Match Schedule'),
+        backgroundColor: AppColors.primaryGreen, // Dark green AppBar
+        foregroundColor: AppColors.white, // White text/icons
+        elevation: 0, // No shadow
       ),
       // Use a FutureBuilder to fetch the current user's role
       body: FutureBuilder<Map<String, dynamic>?>(
@@ -87,14 +88,13 @@ class MatchScheduleScreen extends StatelessWidget {
         builder: (context, userSnapshot) {
           // Show loading indicator while fetching user data
           if (userSnapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: AppColors.accentOrange));
           }
 
           // Handle error or missing user data
           if (userSnapshot.hasError || !userSnapshot.hasData || userSnapshot.data == null) {
             print("Error fetching user data in MatchScheduleScreen: ${userSnapshot.error}");
-            // You might still want to show the schedule but disable editing/booking
-            return Center(child: Text('Error loading user data for permissions/booking.'));
+            return Center(child: Text('Error loading user data for permissions.', style: TextStyle(color: AppColors.white)));
           }
 
           // User data fetched, get the role
@@ -105,90 +105,174 @@ class MatchScheduleScreen extends StatelessWidget {
           final bool canEditMatches = userRole == 'Coach' || userRole == 'Admin';
 
           // Now, build the main content (the match list) using a StreamBuilder
-          return StreamBuilder<QuerySnapshot>(
-            // Fetch matches, ordered by date
-            stream: FirebaseFirestore.instance
-                .collection('matches')
-                .orderBy('matchDate', descending: false) // Order by upcoming date
-                .snapshots(),
-            builder: (context, matchSnapshot) {
-              if (matchSnapshot.hasError) {
-                return Center(child: Text('Error loading match schedule.'));
-              }
+          return Container( // This Container forms the main white "card"
+            decoration: BoxDecoration(
+              color: AppColors.white, // White background for the content area
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(30.0), // Large rounded top-left
+                topRight: Radius.circular(30.0), // Large rounded top-right
+              ),
+            ),
+            child: StreamBuilder<QuerySnapshot>(
+              // Fetch matches, ordered by date
+              stream: FirebaseFirestore.instance
+                  .collection('matches')
+                  .orderBy('matchDate', descending: false) // Order by upcoming date
+                  .snapshots(),
+              builder: (context, matchSnapshot) {
+                if (matchSnapshot.hasError) {
+                  return Center(child: Text('Error loading match schedule.'));
+                }
 
-              if (matchSnapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator());
-              }
+                if (matchSnapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: AppColors.accentOrange));
+                }
 
-              final matches = matchSnapshot.data!.docs;
+                final matches = matchSnapshot.data!.docs;
 
-              if (matches.isEmpty) {
-                return Center(child: Text('No matches scheduled yet.'));
-              }
+                if (matches.isEmpty) {
+                  return Center(child: Text('No matches scheduled yet.'));
+                }
 
-              return ListView.builder(
-                itemCount: matches.length,
-                itemBuilder: (context, index) {
-                  final match = matches[index].data() as Map<String, dynamic>;
-                  final matchDocId = matches[index].id; // Get the document ID for editing/booking
+                return ListView.builder(
+                  padding: EdgeInsets.all(16.0), // Padding inside the list
+                  itemCount: matches.length,
+                  itemBuilder: (context, index) {
+                    final match = matches[index].data() as Map<String, dynamic>;
+                    final matchDocId = matches[index].id; // Get the document ID for editing/booking
 
-                  final Timestamp matchTimestamp = match['matchDate'] ?? Timestamp.now();
-                  final DateTime matchDateTime = matchTimestamp.toDate();
-                  final formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(matchDateTime); // Format the date
+                    final String homeTeamName = match['homeTeamName'] ?? 'TBD';
+                    final String awayTeamName = match['awayTeamName'] ?? 'TBD';
+                    final String status = match['status'] ?? 'Scheduled';
+                    final int homeScore = match['homeTeamScore'] ?? 0;
+                    final int awayScore = match['awayTeamScore'] ?? 0;
 
-                  // Display scores only if the match status indicates completion or in-progress
-                  String scoreDisplay = '';
-                  if (match['status'] == 'Completed' || match['status'] == 'InProgress') {
-                    scoreDisplay = 'Score: ${match['homeTeamScore'] ?? '-'} - ${match['awayTeamScore'] ?? '-'}';
-                  }
+                    final Timestamp matchTimestamp = match['matchDate'] ?? Timestamp.now();
+                    final DateTime matchDateTime = matchTimestamp.toDate();
+                    final formattedDate = DateFormat('yyyy-MM-dd').format(matchDateTime);
+                    final formattedTime = DateFormat('HH:mm').format(matchDateTime);
 
-                  final String homeTeamName = match['homeTeamName'] ?? 'TBD';
-                  final String awayTeamName = match['awayTeamName'] ?? 'TBD';
-                  final String status = match['status'] ?? 'Scheduled';
+                    final bool showScores = status == 'Completed' || status == 'InProgress';
 
-                  // Determine if booking is possible (e.g., if match is Scheduled and in the future)
-                  final bool canBook = status == 'Scheduled' && matchDateTime.isAfter(DateTime.now());
+                    // Determine if booking is possible (e.g., if match is Scheduled and in the future)
+                    final bool canBook = status == 'Scheduled' && matchDateTime.isAfter(DateTime.now());
 
-
-                  return Card(
-                    margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: ListTile(
-                      // Conditionally enable onTap based on user role for editing
-                      onTap: canEditMatches
-                          ? () { // Only allow tap if canEditMatches is true
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddEditMatchScreen(matchId: matchDocId), // Pass the match ID
-                          ),
-                        );
-                      }
-                          : null, // Set onTap to null if user cannot edit
-
-                      title: Text('$homeTeamName vs $awayTeamName'),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Date: $formattedDate'),
-                          Text('Location: ${match['location'] ?? 'TBD'}'),
-                          Text('Status: $status'),
-                          if (scoreDisplay.isNotEmpty) Text(scoreDisplay), // Show score if available
-                        ],
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 8), // Vertical margin only
+                      elevation: 4.0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16.0), // Rounded corners for cards
                       ),
-                      // Add trailing button for booking if possible
-                      trailing: canBook
-                          ? ElevatedButton(
-                        onPressed: () {
-                          _handleMatchBooking(context, matchDocId, homeTeamName, awayTeamName);
-                        },
-                        child: Text('Book Spot'),
-                      )
-                          : null, // Hide the button if booking is not possible
-                    ),
-                  );
-                },
-              );
-            },
+                      child: Padding( // Add padding inside the card
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Team Names
+                                Expanded(
+                                  child: Text(
+                                    '$homeTeamName vs $awayTeamName',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: AppColors.primaryGreen,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                // Edit Button (if applicable)
+                                if (canEditMatches)
+                                  IconButton(
+                                    icon: Icon(Icons.edit, color: AppColors.primaryGreen),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => AddEditMatchScreen(matchId: matchDocId),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            // Date and Time
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today, size: 16, color: AppColors.secondaryGreen),
+                                SizedBox(width: 8),
+                                Text('$formattedDate at $formattedTime', style: TextStyle(fontSize: 14, color: AppColors.darkText)),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            // Location
+                            Row(
+                              children: [
+                                Icon(Icons.location_on, size: 16, color: AppColors.secondaryGreen),
+                                SizedBox(width: 8),
+                                Text(match['location'] ?? 'TBD', style: TextStyle(fontSize: 14, color: AppColors.darkText)),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            // Status and Scores
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Status: $status',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: status == 'InProgress' ? Colors.red : AppColors.primaryGreen,
+                                  ),
+                                ),
+                                if (showScores)
+                                  Text(
+                                    'Score: $homeScore - $awayScore',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: status == 'InProgress' ? Colors.red : AppColors.darkText,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            // Book Spot Button (if applicable)
+                            Center(
+                              child: canBook
+                                  ? ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accentOrange, // Orange button
+                                  foregroundColor: AppColors.white,
+                                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                  ),
+                                ),
+                                child: Text('BOOK SPOT', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                onPressed: () {
+                                  _handleMatchBooking(context, matchDocId, homeTeamName, awayTeamName);
+                                },
+                              )
+                                  : Text(
+                                status == 'Scheduled' && matchDateTime.isBefore(DateTime.now())
+                                    ? 'Booking Closed' // Match is in the past
+                                    : 'Not Available for Booking', // Other statuses
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           );
         },
       ),

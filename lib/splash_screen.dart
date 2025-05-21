@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async'; // Import for Timer
-import 'package:hockey_union_app/wrapper.dart'; // Import your Wrapper widget
+import 'package:hockey_union_app/utils/app_colors.dart';
+import 'package:hockey_union_app/wrapper.dart'; // Import your new AppColors
 
 class SplashScreen extends StatefulWidget {
   @override
@@ -25,36 +26,43 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     // You can customize this screen's appearance
     return Scaffold(
-      backgroundColor: Colors.white, // Or your desired background color
+      backgroundColor: AppColors.primaryGreen, // Dark green background
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // --- Your App Logo/Icon ---
-            // Replace this with your actual logo asset
-            // Example using an asset image (add image to pubspec.yaml and project)
-            // Image.asset(
-            //   'assets/images/your_logo.png', // Your logo asset path
-            //   width: 150, // Adjust size as needed
-            //   height: 150,
-            // ),
-            Icon( // Placeholder icon
-              Icons.sports_hockey,
-              size: 100,
-              color: Colors.blue, // Placeholder color
+            // TODO: Replace this with your actual logo asset (e.g., Image.asset('assets/images/your_logo.png'))
+            // Make sure to add the asset to your pubspec.yaml and project folder.
+            // For now, using a placeholder icon that looks like a hockey player.
+            // If you have the SVG from the image, you'd use a package like flutter_svg
+            // and load it, or convert it to a PNG asset.
+            Icon( // Placeholder icon resembling a hockey player
+              Icons.sports_hockey, // A generic sports icon
+              size: 150,
+              color: AppColors.accentOrange, // Orange/Gold color
             ),
-            SizedBox(height: 20),
+            SizedBox(height: 30),
             Text(
               'Namibia Hockey Union',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Colors.blue, // Placeholder color
+                color: AppColors.white, // White text
               ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Uniting Hockey in Namibia', // Tagline or subtitle
+              style: TextStyle(
+                fontSize: 18,
+                color: AppColors.white.withOpacity(0.8), // Slightly transparent white
+              ),
+              textAlign: TextAlign.center,
             ),
             // Add a loading indicator if you want
             // SizedBox(height: 30),
-            // CircularProgressIndicator(),
+            // CircularProgressIndicator(color: AppColors.accentOrange),
           ],
         ),
       ),

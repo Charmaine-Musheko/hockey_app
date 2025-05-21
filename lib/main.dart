@@ -9,6 +9,7 @@ import 'package:hockey_union_app/services/fcm_service.dart';
 import 'package:hockey_union_app/splash_screen.dart';
 import 'package:hockey_union_app/ui/authentication/auth_screen.dart';
 import 'package:hockey_union_app/ui/home_screen.dart';
+import 'package:hockey_union_app/utils/app_colors.dart';
 import 'package:hockey_union_app/wrapper.dart';
 import 'database/firebase_options.dart';
 
@@ -81,11 +82,105 @@ class HockeyUnionApp extends StatelessWidget {
     return MaterialApp(
       title: 'Hockey Union App',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        // Use your new primary green color
+        primaryColor: AppColors.primaryGreen,
+        // Define a color scheme for better Material 3 integration (optional but good practice)
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: MaterialColor(AppColors.primaryGreen.value, {
+            50: AppColors.primaryGreen.withOpacity(0.1),
+            100: AppColors.primaryGreen.withOpacity(0.2),
+            200: AppColors.primaryGreen.withOpacity(0.3),
+            300: AppColors.primaryGreen.withOpacity(0.4),
+            400: AppColors.primaryGreen.withOpacity(0.5),
+            500: AppColors.primaryGreen,
+            600: AppColors.primaryGreen.withOpacity(0.7),
+            700: AppColors.primaryGreen.withOpacity(0.8),
+            800: AppColors.primaryGreen.withOpacity(0.9),
+            900: AppColors.primaryGreen.withOpacity(1.0),
+          }),
+          accentColor: AppColors.accentOrange, // Use your accent color
+        ).copyWith(
+          background: AppColors.primaryGreen, // Overall app background
+          surface: AppColors.white, // For cards, sheets, etc.
+          secondary: AppColors.accentOrange, // Ensure accentColor is set as secondary
+        ),
+
+        // Customize AppBar theme
+        appBarTheme: AppBarTheme(
+          backgroundColor: AppColors.primaryGreen, // Dark green AppBar
+          foregroundColor: AppColors.white, // White text/icons on AppBar
+          centerTitle: true, // Center title by default
+          elevation: 0, // No shadow for a flat look
+        ),
+
+        // Customize ElevatedButton theme for consistent button styling
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accentOrange, // Orange/Gold buttons
+            foregroundColor: AppColors.white, // White text on buttons
+            padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0), // Consistent padding
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0), // Rounded corners for buttons
+            ),
+            textStyle: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+
+        // Customize TextButton theme
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.accentOrange, // Orange/Gold text buttons
+            textStyle: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+
+        // Customize input field decoration (for TextFormField)
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.white, // White background for input fields
+          labelStyle: TextStyle(color: AppColors.primaryGreen), // Green label text
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0), // Rounded corners for input fields
+            borderSide: BorderSide.none, // No border by default
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: AppColors.primaryGreen.withOpacity(0.5), width: 1.0), // Light green border when enabled
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: AppColors.primaryGreen, width: 2.0), // Stronger green border when focused
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.red, width: 1.0),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            borderSide: BorderSide(color: Colors.red, width: 2.0),
+          ),
+          contentPadding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0), // Padding inside the field
+        ),
+
+        // Customize Card theme
+        cardTheme: CardTheme(
+          elevation: 4.0, // Add some shadow
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0), // Rounded corners for cards
+          ),
+          color: AppColors.white, // White background for cards
+        ),
+
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      navigatorKey: FcmService.navigatorKey, // Assign the GlobalKey here
-      home: SplashScreen(),
+      home: SplashScreen(), // Start with the SplashScreen
     );
   }
 }
