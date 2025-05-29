@@ -1,299 +1,362 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:hockey_union_app/services/auth_service.dart'; // Adjust path if needed
-import 'package:hockey_union_app/utils/app_colors.dart'; // Import your new AppColors
+import 'package:hockey_union_app/services/auth_service.dart';
+import 'package:hockey_union_app/ui/home_screen.dart';
+import 'package:hockey_union_app/utils/app_colors.dart';
+import 'package:image_picker/image_picker.dart'; // Import for image picking
+import 'dart:io'; // Required for File class
 
 class AuthScreen extends StatefulWidget {
+  const AuthScreen({Key? key}) : super(key: key);
+
   @override
-  _AuthScreenState createState() => _AuthScreenState();
+  State<AuthScreen> createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen> {
   final AuthService _auth = AuthService();
-  final _formKey = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>(); // Key for form validation
 
-  // Text field controllers
+  // Text editing controllers for input fields
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController(); // For user's name
-  final TextEditingController _surnameController = TextEditingController(); // For user's surname
-  final TextEditingController _roleReasonController = TextEditingController(); // For reason for role
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _roleReasonController = TextEditingController(); // For the role reason
+  String _selectedRole = 'Fan'; // Default role for registration
 
-  String error = '';
-  bool showSignIn = true; // Toggle between Sign In and Register
-  bool _isLoading = false; // To show loading for auth operations
+  bool _isLogin = true; // State to switch between login and registration
+  bool _isLoading = false; // State for loading indicator
 
-  String? _desiredRole; // To store the user's desired role during registration
-  final List<String> _availableRoles = ['Fan', 'Player', 'Coach']; // Roles users can request
+  File? _pickedImage; // To store the picked image file
 
-  void toggleView() {
-    setState(() {
-      showSignIn = !showSignIn;
-      _formKey.currentState?.reset();
-      error = ''; // Clear error message on toggle
-      _emailController.clear();
-      _passwordController.clear();
-      _nameController.clear();
-      _surnameController.clear();
-      _roleReasonController.clear();
-      _desiredRole = null; // Clear desired role
-    });
-  }
+  // Function to pick an image
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedImageFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
 
-  // Function to handle password reset
-  Future<void> _forgotPassword() async {
-    // Basic validation: Check if email is entered and looks like an email
-    if (_emailController.text.isEmpty || !_emailController.text.contains('@') || !_emailController.text.contains('.')) {
+    if (pickedImageFile != null) {
       setState(() {
-        error = 'Please enter a valid email to reset password.';
-      });
-      return; // Stop if email is invalid
-    }
-
-    setState(() {
-      _isLoading = true; // Start loading
-      error = ''; // Clear previous errors
-    });
-
-    // Call the sendPasswordResetEmail method from AuthService
-    String? result = await _auth.sendPasswordResetEmail(_emailController.text);
-
-    setState(() {
-      _isLoading = false; // Stop loading
-    });
-
-    if (result == null) {
-      // Success: Password reset email sent
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Password reset email sent to ${_emailController.text}. Check your inbox.')),
-      );
-    } else {
-      // Handle errors based on the error code returned from AuthService
-      String errorMessage = 'Failed to send password reset email.';
-      if (result == 'user-not-found') {
-        errorMessage = 'No user found for that email.';
-      } else if (result == 'invalid-email') {
-        errorMessage = 'The email address is not valid.';
-      } else if (result == 'network-request-failed') {
-        errorMessage = 'Network error. Please check your connection.';
-      }
-
-      setState(() {
-        error = errorMessage; // Display the specific error message
+        _pickedImage = File(pickedImageFile.path);
       });
     }
   }
+
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
-    _surnameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _roleReasonController.dispose();
     super.dispose();
   }
 
+  void _submitAuthForm() async {
+    // Ensure the widget is still mounted before proceeding with setState
+    if (!mounted) return;
+
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true; // Show loading indicator
+      });
+
+      String? errorMessage;
+      User? user; // Using the Firebase User type for clarity
+
+      try {
+        if (_isLogin) {
+          // Login logic
+          user = await _auth.signInWithEmailAndPassword(
+            _emailController.text.trim(),
+            _passwordController.text.trim(),
+          );
+        } else {
+          // Registration logic
+          user = await _auth.signUpWithEmailAndPassword(
+            _emailController.text.trim(),
+            _passwordController.text.trim(),
+            _firstNameController.text.trim(),
+            _lastNameController.text.trim(),
+            _selectedRole, // Pass the selected role
+            _roleReasonController.text.trim(), // Pass the role reason
+            _pickedImage, // Pass the picked image
+          );
+        }
+
+        if (user != null) {
+          print('User ${user.uid} logged in with role: $_selectedRole'); // Log the user and role
+
+          // NavigatAe to HomeScreen on successful login/registration
+          // Ensure we don't try to navigate if the context is no longer valid
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => HomeScreen(userId: user!.uid)),
+            );
+          }
+        } else {
+          // Handle case where user is null (e.g., authentication failed without an explicit exception)
+          errorMessage = "Authentication failed. Please check your credentials.";
+        }
+      } on FirebaseAuthException catch (e) {
+        // Handle Firebase specific errors
+        errorMessage = e.message;
+        print("FirebaseAuthException: ${e.code} - ${e.message}");
+      } catch (e) {
+        // Handle other general errors
+        errorMessage = "An unexpected error occurred: ${e.toString()}";
+        print("General Error: ${e.toString()}");
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false; // Hide loading indicator
+          });
+          if (errorMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(errorMessage!)),
+            );
+          }
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primaryGreen, // Dark green background
-      appBar: AppBar(
-        title: Text(showSignIn ? 'Sign In' : 'Register'),
-        backgroundColor: AppColors.primaryGreen, // Dark green AppBar
-        foregroundColor: AppColors.white, // White text/icons
-        elevation: 0, // No shadow
-        actions: <Widget>[
-          TextButton.icon(
-            icon: Icon(showSignIn ? Icons.person_add : Icons.login, color: AppColors.white),
-            label: Text(showSignIn ? 'Register' : 'Sign In', style: TextStyle(color: AppColors.white)),
-            onPressed: () => toggleView(),
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.accentOrange)) // Show loading indicator
-          : SingleChildScrollView( // Use SingleChildScrollView for scrollability
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 30.0, horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                // App Logo/Icon
-                Center(
-                  child: Icon(
-                    Icons.sports_hockey, // Placeholder icon
-                    size: 100,
-                    color: AppColors.accentOrange,
-                  ),
-                ),
-                SizedBox(height: 20),
-                Center(
-                  child: Text(
-                    showSignIn ? 'Welcome Back!' : 'Create Your Account',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.white, // White text
-                    ),
-                  ),
-                ),
-                SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    showSignIn ? 'Sign in to continue' : 'Join the Hockey Union community',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.white.withOpacity(0.8),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 40),
+      backgroundColor: AppColors.primaryGreen,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Card(
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // --- ADDED LOGO HERE ---
+                      Image.asset(
+                        'assets/images/IMG_7434.png', // Path to your logo
+                        height: 120, // Adjust height as needed
+                        fit: BoxFit.contain, // Ensures the entire image is visible within its bounds
+                      ),
+                      const SizedBox(height: 20), // Spacing below the logo
 
-                TextFormField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email, color: AppColors.primaryGreen),
-                  ),
-                  validator: (val) => val!.isEmpty ? 'Enter an email' : null,
-                ),
-                SizedBox(height: 20.0),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock, color: AppColors.primaryGreen),
-                  ),
-                  obscureText: true,
-                  validator: (val) => val!.length < 6 ? 'Password must be at least 6 characters' : null,
-                ),
-                SizedBox(height: 20.0),
-
-                // New fields for Registration
-                if (!showSignIn) ...[
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'First Name',
-                      prefixIcon: Icon(Icons.person, color: AppColors.primaryGreen),
-                    ),
-                    validator: (val) => val!.isEmpty ? 'Enter your first name' : null,
-                  ),
-                  SizedBox(height: 20.0),
-                  TextFormField(
-                    controller: _surnameController,
-                    decoration: InputDecoration(
-                      labelText: 'Last Name',
-                      prefixIcon: Icon(Icons.person_outline, color: AppColors.primaryGreen),
-                    ),
-                    validator: (val) => val!.isEmpty ? 'Enter your last name' : null,
-                  ),
-                  SizedBox(height: 20.0),
-                  DropdownButtonFormField<String>(
-                    value: _desiredRole,
-                    decoration: InputDecoration(
-                      labelText: 'Desired Role',
-                      prefixIcon: Icon(Icons.badge, color: AppColors.primaryGreen),
-                    ),
-                    items: _availableRoles.map((role) {
-                      return DropdownMenuItem(
-                        value: role,
-                        child: Text(role),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _desiredRole = val;
-                      });
-                    },
-                    validator: (val) => val == null ? 'Please select a desired role' : null,
-                  ),
-                  SizedBox(height: 20.0),
-                  TextFormField(
-                    controller: _roleReasonController,
-                    decoration: InputDecoration(
-                      labelText: 'Reason for Role (Optional)',
-                      prefixIcon: Icon(Icons.info_outline, color: AppColors.primaryGreen),
-                    ),
-                    maxLines: 3,
-                    keyboardType: TextInputType.multiline,
-                  ),
-                  SizedBox(height: 30.0),
-                ],
-
-                ElevatedButton(
-                  child: Text(showSignIn ? 'Sign In' : 'Register'),
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      setState(() {
-                        _isLoading = true;
-                        error = '';
-                      });
-
-                      dynamic result;
-                      if (showSignIn) {
-                        result = await _auth.signInWithEmailAndPassword(
-                            _emailController.text, _passwordController.text);
-                        if (result == null) {
-                          setState(() {
-                            error = 'Could not sign in with those credentials.';
-                          });
-                        }
-                      } else {
-                        try {
-                          // Pass name, surname, desired role, and reason to signUp
-                          result = await _auth.signUpWithEmailAndPassword(
-                            _emailController.text,
-                            _passwordController.text,
-                            _nameController.text,
-                            _surnameController.text,
-                            _desiredRole!, // _desiredRole is guaranteed non-null by validator
-                            _roleReasonController.text,
-                          );
-                          if (result == null) {
-                            setState(() {
-                              if (_passwordController.text.length < 6) {
-                                error = 'Password must be at least 6 characters.';
-                              } else if (!_emailController.text.contains('@') || !_emailController.text.contains('.')) {
-                                error = 'Please enter a valid email address.';
-                              } else {
-                                error = 'Registration failed. Email may already be in use or other issue.';
-                              }
-                            });
+                      Text(
+                        _isLogin ? 'Welcome Back!' : 'Create Account',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryGreen,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      if (!_isLogin)
+                        GestureDetector(
+                          onTap: _pickImage, // Call image picker on tap
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundColor: AppColors.secondaryGreen,
+                            backgroundImage: _pickedImage != null ? FileImage(_pickedImage!) : null,
+                            child: _pickedImage == null
+                                ? Icon(
+                              Icons.add_a_photo,
+                              size: 50,
+                              color: AppColors.white.withOpacity(0.8),
+                            )
+                                : null,
+                          ),
+                        ),
+                      if (!_isLogin) SizedBox(height: 20),
+                      if (!_isLogin)
+                        TextFormField(
+                          controller: _firstNameController,
+                          decoration: InputDecoration(
+                            labelText: 'First Name',
+                            prefixIcon: Icon(Icons.person, color: AppColors.primaryGreen),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your first name.';
+                            }
+                            return null;
+                          },
+                        ),
+                      if (!_isLogin) SizedBox(height: 16),
+                      if (!_isLogin)
+                        TextFormField(
+                          controller: _lastNameController,
+                          decoration: InputDecoration(
+                            labelText: 'Last Name',
+                            prefixIcon: Icon(Icons.person_outline, color: AppColors.primaryGreen),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your last name.';
+                            }
+                            return null;
+                          },
+                        ),
+                      if (!_isLogin) SizedBox(height: 16),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email, color: AppColors.primaryGreen),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty || !value.contains('@')) {
+                            return 'Please enter a valid email address.';
                           }
-                        } catch (e) {
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock, color: AppColors.primaryGreen),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty || value.length < 6) {
+                            return 'Password must be at least 6 characters long.';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (!_isLogin) SizedBox(height: 16),
+                      if (!_isLogin)
+                        DropdownButtonFormField<String>(
+                          value: _selectedRole,
+                          decoration: InputDecoration(
+                            labelText: 'Request Role',
+                            prefixIcon: Icon(Icons.person_add, color: AppColors.primaryGreen),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                          items: <String>['Fan', 'Player', 'Coach']
+                              .map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedRole = newValue!;
+                            });
+                          },
+                        ),
+                      if (!_isLogin && _selectedRole != 'Fan') SizedBox(height: 16),
+                      if (!_isLogin && _selectedRole != 'Fan')
+                        TextFormField(
+                          controller: _roleReasonController,
+                          decoration: InputDecoration(
+                            labelText: 'Reason for Role Request (e.g., "I am a professional player")',
+                            prefixIcon: Icon(Icons.info_outline, color: AppColors.primaryGreen),
+                          ),
+                          maxLines: 3,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please provide a reason for your role request.';
+                            }
+                            return null;
+                          },
+                        ),
+                      SizedBox(height: 20),
+                      _isLoading
+                          ? CircularProgressIndicator(color: AppColors.accentOrange)
+                          : ElevatedButton(
+                        onPressed: _submitAuthForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accentOrange,
+                          foregroundColor: AppColors.white,
+                          padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.0),
+                          ),
+                        ),
+                        child: Text(
+                          _isLogin ? 'Login' : 'Sign Up',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () {
                           setState(() {
-                            error = 'An unexpected error occurred: ${e.toString()}';
+                            _isLogin = !_isLogin; // Toggle between login and registration
+                            _formKey.currentState?.reset(); // Clear form fields
+                            _emailController.clear();
+                            _passwordController.clear();
+                            _firstNameController.clear();
+                            _lastNameController.clear();
+                            _roleReasonController.clear();
+                            _pickedImage = null; // Clear picked image on toggle
+                            // Add this line to reset the selected role
+                            _selectedRole = 'Fan';
                           });
-                        }
-                      }
-
-                      setState(() => _isLoading = false);
-
-                      if (result == null && error == '') {
-                        setState(() {
-                          error = showSignIn ? 'Could not sign in with those credentials.' : 'Could not register with those credentials.';
-                        });
-                      }
-                    }
-                  },
+                        },
+                        child: Text(
+                          _isLogin
+                              ? 'Don\'t have an account? Sign Up'
+                              : 'Already have an account? Login',
+                          style: TextStyle(color: AppColors.primaryGreen),
+                        ),
+                      ),
+                      if (_isLogin) // Only show forgot password on login screen
+                        TextButton(
+                          onPressed: () async {
+                            // Implement forgot password logic here
+                            final String email = _emailController.text.trim();
+                            if (email.isEmpty || !email.contains('@')) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Please enter a valid email to reset password.')),
+                              );
+                              return;
+                            }
+                            setState(() {
+                              _isLoading = true;
+                            });
+                            String? error = await _auth.sendPasswordResetEmail(email);
+                            if (mounted) {
+                              setState(() {
+                                _isLoading = false;
+                              });
+                              if (error == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Password reset email sent to $email')),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to send reset email: $error')),
+                                );
+                              }
+                            }
+                          },
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(color: AppColors.accentOrange),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 12.0),
-                TextButton(
-                  child: Text('Forgot Password?', style: TextStyle(color: AppColors.accentOrange)),
-                  onPressed: showSignIn ? _forgotPassword : null,
-                ),
-                SizedBox(height: 12.0),
-                Text(
-                  error,
-                  style: TextStyle(color: Colors.red, fontSize: 14.0),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
             ),
           ),
         ),

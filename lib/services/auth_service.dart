@@ -1,16 +1,16 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // Import Firebase Messaging
-import 'package:hockey_union_app/services/fcm_service.dart'; // Import the new FcmService
-
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // Import Firebase Storage
+import 'package:hockey_union_app/services/fcm_service.dart';
+import 'dart:io'; // Required for File class
 
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FcmService _fcmService = FcmService(); // Create an instance of FcmService
+  final FirebaseStorage _firebaseStorage = FirebaseStorage.instance; // Initialize Firebase Storage
+  final FcmService _fcmService = FcmService();
 
-
-  // Get the current user
   User? getCurrentUser() {
     return _firebaseAuth.currentUser;
   }
@@ -23,75 +23,95 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
-        // User signed in successfully, get and save FCM token using FcmService
         String? fcmToken = await FirebaseMessaging.instance.getToken();
-        await _fcmService.saveTokenToFirestore(fcmToken); // Use the new service
+        await _fcmService.saveTokenToFirestore(fcmToken);
       }
 
       return user;
     } on FirebaseAuthException catch (e) {
       print("Firebase Auth Error during Sign In: ${e.code} - ${e.message}");
-      return null; // Return null on error
+      return null;
     } catch (e) {
       print("General Error during Sign In: ${e.toString()}");
-      return null; // Return null on error
+      return null;
     }
   }
 
   // Sign up with email and password AND create user document in Firestore
-  // Updated to accept firstName, lastName, desiredRole, and roleReason
-  Future<User?> signUpWithEmailAndPassword(String email, String password, String firstName, String lastName, String desiredRole, String roleReason) async {
+  Future<User?> signUpWithEmailAndPassword(
+      String email,
+      String password,
+      String firstName,
+      String lastName,
+      String requestedRole,
+      String roleReason,
+      File? profileImage, // New parameter for profile image
+      ) async {
     try {
       UserCredential result = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email, password: password);
       User? user = result.user;
 
       if (user != null) {
+        String? profileImageUrl;
+        if (profileImage != null) {
+          // Upload image to Firebase Storage
+          final ref = _firebaseStorage
+              .ref()
+              .child('user_profile_images')
+              .child('${user.uid}.jpg'); // Unique path for each user's profile image
+
+          await ref.putFile(profileImage);
+          profileImageUrl = await ref.getDownloadURL(); // Get download URL
+        }
+
         // Create a new document for the user in the 'users' collection
         await _firestore.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email,
-          'firstName': firstName, // Save first name
-          'lastName': lastName,   // Save last name
-          'role': 'Fan',           // Default to 'Fan' role, admin approval needed for others
-          'desiredRole': desiredRole, // Save desired role
-          'roleReason': roleReason, // Save reason for desired role
+          'firstName': firstName,
+          'lastName': lastName,
+          'role': 'Fan', // Default role for new registrations
+          'profileImageUrl': profileImageUrl, // Save the image URL
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // User signed up successfully, get and save FCM token using FcmService
+        if (requestedRole != 'Fan') {
+          await _firestore.collection('roleRequests').add({
+            'userId': user.uid,
+            'email': user.email,
+            'firstName': firstName,
+            'lastName': lastName,
+            'requestedRole': requestedRole,
+            'roleReason': roleReason,
+            'status': 'Pending',
+            'requestDate': FieldValue.serverTimestamp(),
+          });
+          print('Role upgrade request submitted for ${user.email} to $requestedRole');
+        }
+
         String? fcmToken = await FirebaseMessaging.instance.getToken();
-        await _fcmService.saveTokenToFirestore(fcmToken); // Use the new service
+        await _fcmService.saveTokenToFirestore(fcmToken);
       }
 
       return user;
     } on FirebaseAuthException catch (e) {
       print("Firebase Auth Error during Sign Up: ${e.code} - ${e.message}");
-      return null; // Return null on error
+      return null;
     } catch (e) {
       print("General Error during Sign Up: ${e.toString()}");
-      return null; // Return null on error
+      return null;
     }
   }
 
-  // Add a method to get user data from Firestore
   Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
       DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         return doc.data() as Map<String, dynamic>?;
       } else {
-        print('User document not found for uid: $uid on first attempt. Retrying...');
-        // Add a small delay and retry once
-        await Future.delayed(Duration(seconds: 1)); // Wait for 1 second
-        doc = await _firestore.collection('users').doc(uid).get();
-        if (doc.exists) {
-          print('User document found on retry for uid: $uid');
-          return doc.data() as Map<String, dynamic>?;
-        } else {
-          print('User document still not found for uid: $uid after retry.');
-          return null;
-        }
+        print('User document not found for uid: $uid');
+        return null;
       }
     } catch (e) {
       print("Error getting user data: ${e.toString()}");
@@ -99,30 +119,21 @@ class AuthService {
     }
   }
 
-  // Method to send password reset email
   Future<String?> sendPasswordResetEmail(String email) async {
     try {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
-      return null; // Return null on success
+      return null;
     } on FirebaseAuthException catch (e) {
       print("Firebase Auth Error sending password reset email: ${e.code} - ${e.message}");
-      return e.code; // Return error code on failure
+      return e.code;
     } catch (e) {
       print("General Error sending password reset email: ${e.toString()}");
-      return 'unknown-error'; // Return a generic error code
+      return 'unknown-error';
     }
   }
 
-
-  // Sign out
   Future<void> signOut() async {
     try {
-      // Optional: Consider removing the FCM token from Firestore on sign out
-      // This prevents sending notifications to a device after the user logs out.
-      // However, if the user has multiple devices logged in, you'd only want to remove
-      // the token for the device that is signing out. This requires more complex token management.
-      // For now, we'll leave tokens in place on sign out.
-
       return await _firebaseAuth.signOut();
     } catch (e) {
       print(e.toString());
@@ -130,6 +141,5 @@ class AuthService {
     }
   }
 
-  // Auth state changes stream
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 }

@@ -31,16 +31,10 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // --- Your App Logo/Icon ---
-            // TODO: Replace this with your actual logo asset (e.g., Image.asset('assets/images/your_logo.png'))
-            // Make sure to add the asset to your pubspec.yaml and project folder.
-            // For now, using a placeholder icon that looks like a hockey player.
-            // If you have the SVG from the image, you'd use a package like flutter_svg
-            // and load it, or convert it to a PNG asset.
-            Icon( // Placeholder icon resembling a hockey player
-              Icons.sports_hockey, // A generic sports icon
-              size: 150,
-              color: AppColors.accentOrange, // Orange/Gold color
+            Image.asset(
+              'assets/images/IMG_7434.png', // Path to your logo
+              height: 120, // Adjust height as needed
+              fit: BoxFit.contain, // Ensures the entire image is visible within its bounds
             ),
             SizedBox(height: 30),
             Text(

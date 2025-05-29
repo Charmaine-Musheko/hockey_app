@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:hockey_union_app/ui/authentication/admin_approval.dart';
 import 'package:hockey_union_app/ui/players/manage_players_screen.dart';
 import 'package:hockey_union_app/ui/predictions/game_predictions.dart';
 import 'package:hockey_union_app/ui/teams/team_list_screen.dart';
@@ -72,12 +73,20 @@ class HomeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: AppColors.accentOrange.withOpacity(0.5),
-                        child: Icon(Icons.person, size: 40, color: AppColors.white),
-                      ),
-                      SizedBox(height: 10),
+                    CircleAvatar(
+                    backgroundColor: AppColors.secondaryGreen,
+                    // Display profile image or a default icon
+                    backgroundImage: (userData?['profileImageUrl'] != null && userData!['profileImageUrl'].isNotEmpty)
+                        ? NetworkImage(userData!['profileImageUrl']) as ImageProvider
+                        : null, // If no image, then no background image
+                    child: (userData?['profileImageUrl'] == null || userData!['profileImageUrl'].isEmpty)
+                        ? Icon(
+                      Icons.person,
+                      size: 50,
+                      color: AppColors.white.withOpacity(0.8),
+                    )
+                        : null, // If image exists, no child icon
+                  ),
                       Text(
                         'Welcome, $userName',
                         style: TextStyle(
@@ -224,8 +233,20 @@ class HomeScreen extends StatelessWidget {
                     );
                   },
                 ),
-
+            if ( userRole == 'Admin')
+            ListTile(
+            leading: Icon(Icons.group_add, color: AppColors.white),
+            title: Text('Approve Users', style: TextStyle(color: AppColors.white)),
+            onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => RoleApprovalScreen()),
+            );
+            },
+            ),
                 Divider(color: AppColors.white.withOpacity(0.5)),
+
                 // Logout is now in AppBar, but keeping it here as well for consistency if user prefers drawer
                 ListTile(
                   leading: Icon(Icons.logout, color: AppColors.accentOrange),
@@ -519,7 +540,7 @@ class HomeScreen extends StatelessWidget {
                                 final Timestamp publishTimestamp = news['publishDate'] ?? Timestamp.now();
                                 final DateTime publishDateTime = publishTimestamp.toDate();
                                 final formattedNewsDate = DateFormat('dd MMMMEEEE').format(publishDateTime);
-
+                                final String? imageUrl = news['imageUrl'];
                                 return Card(
                                   margin: EdgeInsets.only(bottom: 12),
                                   elevation: 2,
@@ -531,13 +552,32 @@ class HomeScreen extends StatelessWidget {
                                       children: [
                                         Container(
                                           width: 80,
-                                          height: 80,
+                                          height: 90,
                                           decoration: BoxDecoration(
                                             color: AppColors.secondaryGreen.withOpacity(0.2),
                                             borderRadius: BorderRadius.circular(8.0),
                                           ),
-                                          child: Icon(Icons.image, size: 40, color: AppColors.secondaryGreen),
+                                          child: (imageUrl != null && imageUrl.isNotEmpty)
+                                              ? Image.network(
+                                            imageUrl,
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              width: 60,
+                                              height: 60,
+                                              color: Colors.grey[300],
+                                              child: Icon(Icons.broken_image, size: 30, color: Colors.grey[600]),
+                                            ),
+                                          )
+                                              : Container( // Added a Container for the else case
+                                            width: 60,
+                                            height: 60,
+                                            color: Colors.grey[300],
+                                            child: Icon(Icons.image, size: 30, color: Colors.grey[600]), // You can use a different icon here
+                                          ),
                                         ),
+
                                         SizedBox(width: 16),
                                         Expanded(
                                           child: Column(
@@ -639,7 +679,7 @@ class HomeScreen extends StatelessWidget {
                       label: 'Chat',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.menu, size: 28),
+                      icon: Icon(Icons.account_balance, size: 28),
                       label: 'More',
                     ),
                   ],
@@ -662,6 +702,7 @@ class HomeScreen extends StatelessWidget {
                         );
                         break;
                       case 3: // More tab (opens drawer)
+
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => UserMatchBookingsScreen()),
