@@ -21,9 +21,9 @@ class TeamListScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Registered Teams'),
       ),
-      // Use a FutureBuilder to fetch the current user's role
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: _auth.getUserData(userId), // Fetch user data using the passed userId
+      // --- CRITICAL CHANGE HERE: Use StreamBuilder instead of FutureBuilder ---
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _auth.getUserDataStream(userId), // <--- Use the new Stream method
         builder: (context, userSnapshot) {
           // Show loading indicator while fetching user data
           if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -31,15 +31,16 @@ class TeamListScreen extends StatelessWidget {
           }
 
           // Handle error or missing user data
-          if (userSnapshot.hasError || !userSnapshot.hasData || userSnapshot.data == null) {
-            print("Error fetching user data in TeamListScreen: ${userSnapshot.error}");
+          // Check if userSnapshot has data and if the document exists
+          if (userSnapshot.hasError || !userSnapshot.hasData || !userSnapshot.data!.exists) {
+            print("Error or missing user data in TeamListScreen: ${userSnapshot.error ?? 'Document does not exist.'}");
             // You might still want to show the team list even if user data fails
             return Center(child: Text('Error loading user data for permissions.'));
           }
 
           // User data fetched, get the role
-          final userData = userSnapshot.data!;
-          final userRole = userData['role'] ?? 'Fan'; // Default to 'Fan'
+          final userData = userSnapshot.data!.data(); // Get the data map
+          final userRole = userData?['role'] ?? 'Fan'; // Default to 'Fan' if userData is null or role is missing
 
           // Determine if the user is allowed to see the management buttons
           final bool canManagePlayers = userRole == 'Coach' || userRole == 'Admin';

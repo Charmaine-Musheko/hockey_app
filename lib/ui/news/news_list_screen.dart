@@ -19,11 +19,11 @@ class NewsListScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('News & Announcements'),
-        // The Add button will be a FloatingActionButton defined in the body's FutureBuilder
+        // The Add button will be a FloatingActionButton defined in the body's StreamBuilder
       ),
-      // Use a FutureBuilder to fetch the current user's role and build the body and FAB
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: _auth.getUserData(userId), // Fetch user data using the passed userId
+      // --- CRITICAL CHANGE HERE: Use StreamBuilder instead of FutureBuilder ---
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _auth.getUserDataStream(userId), // <--- Use the new Stream method
         builder: (context, userSnapshot) {
           // Show loading indicator while fetching user data
           if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -31,17 +31,14 @@ class NewsListScreen extends StatelessWidget {
           }
 
           // Handle error or missing user data
-          if (userSnapshot.hasError || !userSnapshot.hasData || userSnapshot.data == null) {
-            print("Error fetching user data in NewsListScreen: ${userSnapshot.error}");
-            // You might still want to show the news list even if user data fails
-            // For now, let's show an error message, but you could adjust this
-            // You can also return an empty list or a list with an error message card
+          if (userSnapshot.hasError || !userSnapshot.hasData || !userSnapshot.data!.exists) {
+            print("Error or missing user data in NewsListScreen: ${userSnapshot.error ?? 'Document does not exist.'}");
             return Center(child: Text('Error loading user data for permissions.'));
           }
 
           // User data fetched, get the role
-          final userData = userSnapshot.data!;
-          final userRole = userData['role'] ?? 'Fan'; // Default to 'Fan'
+          final userData = userSnapshot.data!.data();
+          final userRole = userData?['role'] ?? 'Fan'; // Default to 'Fan'
 
           // Determine if the user is allowed to add news
           final bool canAddNews = userRole == 'Coach' || userRole == 'Admin';

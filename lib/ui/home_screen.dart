@@ -152,17 +152,7 @@ class HomeScreen extends StatelessWidget {
 
                 // Admin/Coach specific functions
                 if (userRole == 'Coach' || userRole == 'Admin') ...[
-                  ListTile(
-                    leading: Icon(Icons.group_add, color: AppColors.white),
-                    title: Text('Register a Team', style: TextStyle(color: AppColors.white)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => TeamRegistrationScreen()),
-                      );
-                    },
-                  ),
+
                   ListTile(
                     leading: Icon(Icons.sports_baseball, color: AppColors.white),
                     title: Text('Manage Players', style: TextStyle(color: AppColors.white)),
@@ -174,17 +164,7 @@ class HomeScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  ListTile(
-                    leading: Icon(Icons.add_box, color: AppColors.white),
-                    title: Text('Add New Match', style: TextStyle(color: AppColors.white)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => AddEditMatchScreen()),
-                      );
-                    },
-                  ),
+
                   ListTile(
                     leading: Icon(Icons.newspaper, color: AppColors.white),
                     title: Text('News & Announcements', style: TextStyle(color: AppColors.white)),
@@ -233,7 +213,31 @@ class HomeScreen extends StatelessWidget {
                     );
                   },
                 ),
+                if ( userRole == 'Admin')
+                ListTile(
+                  leading: Icon(Icons.group_add, color: AppColors.white),
+                  title: Text('Register a Team', style: TextStyle(color: AppColors.white)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TeamRegistrationScreen()),
+                    );
+                  },
+                ),
             if ( userRole == 'Admin')
+              ListTile(
+                leading: Icon(Icons.add_box, color: AppColors.white),
+                title: Text('Add New Match', style: TextStyle(color: AppColors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => AddEditMatchScreen()),
+                  );
+                },
+              ),
+                if ( userRole == 'Admin')
             ListTile(
             leading: Icon(Icons.group_add, color: AppColors.white),
             title: Text('Approve Users', style: TextStyle(color: AppColors.white)),

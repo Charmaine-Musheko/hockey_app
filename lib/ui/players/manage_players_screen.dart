@@ -18,54 +18,14 @@ class _ManagePlayersScreenState extends State<ManagePlayersScreen> {
   List<DropdownMenuItem<String>> _teamDropdownItems = []; // List to hold team dropdown items
   Map<String, String> _teamNames = {}; // Map to store team IDs and names
 
-  bool _isLoadingTeams = true; // To indicate if teams are being fetched
-  String? _userRole; // To store the fetched user role
+  // We no longer need _isLoadingTeams and _userRole as instance variables
+  // because StreamBuilder will handle the loading state and provide the data.
 
   @override
   void initState() {
     super.initState();
-    _fetchUserDataAndTeams(); // Fetch user data and teams when the screen initializes
+    _fetchTeams(); // Only fetch teams initially. User role will be handled by StreamBuilder.
   }
-
-  // Function to fetch user data and then teams
-  Future<void> _fetchUserDataAndTeams() async {
-    setState(() {
-      _isLoadingTeams = true;
-    });
-    try {
-      final userData = await AuthService().getUserData(widget.userId);
-      if (userData != null) {
-        _userRole = userData['role'] ?? 'Fan';
-        // Only fetch teams if the user is authorized to manage players
-        if (_userRole == 'Coach' || _userRole == 'Admin') {
-          await _fetchTeams(); // Fetch teams after getting user role
-          // If user has a teamId associated, pre-select it in the dropdown
-          final String? userAssociatedTeamId = userData['teamId'];
-          if (userAssociatedTeamId != null && _teamNames.containsKey(userAssociatedTeamId)) {
-            setState(() {
-              _selectedTeamId = userAssociatedTeamId;
-            });
-          } else if (_teamDropdownItems.isNotEmpty) {
-            // If no associated team or team not found, select the first team
-            setState(() {
-              _selectedTeamId = _teamDropdownItems.first.value;
-            });
-          }
-        }
-      } else {
-        // Handle case where user data couldn't be fetched
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load user data.')));
-      }
-    } catch (e) {
-      print("Error fetching user data or teams: $e");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load data.')));
-    } finally {
-      setState(() {
-        _isLoadingTeams = false;
-      });
-    }
-  }
-
 
   // Function to fetch the list of teams from Firestore
   Future<void> _fetchTeams() async {
@@ -88,11 +48,14 @@ class _ManagePlayersScreenState extends State<ManagePlayersScreen> {
       setState(() {
         _teamDropdownItems = items;
         _teamNames = names;
+        // If teams are fetched, and _selectedTeamId is null, try to set the first one
+        if (_selectedTeamId == null && _teamDropdownItems.isNotEmpty) {
+          _selectedTeamId = _teamDropdownItems.first.value;
+        }
       });
 
     } catch (e) {
       print("Error fetching teams: $e");
-      // Optionally show an error message to the user
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load teams.')));
     }
   }
@@ -142,135 +105,139 @@ class _ManagePlayersScreenState extends State<ManagePlayersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Check if the user role is loaded and authorized
-    if (_isLoadingTeams) {
-      return Scaffold(
-        appBar: AppBar(title: Text('Manage Players')),
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    final AuthService _auth = AuthService();
 
-    if (_userRole != 'Coach' && _userRole != 'Admin') {
-      return Scaffold(
-        appBar: AppBar(title: Text('Manage Players')),
-        body: Center(child: Text('You do not have permission to manage players.')),
-      );
-    }
-
-    // User is authorized, show the screen content
     return Scaffold(
       appBar: AppBar(
         title: Text('Manage Players'),
       ),
-      body: Column( // Use a Column to arrange dropdown and player list
-        children: [
-          // Team Selection Dropdown
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: 'Select Team to Manage',
-                enabled: _teamDropdownItems.isNotEmpty, // Corrected: enabled on InputDecoration
+      // --- Use StreamBuilder to get real-time user data ---
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _auth.getUserDataStream(widget.userId),
+        builder: (context, userSnapshot) {
+          if (userSnapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          // Handle error or missing user data
+          if (userSnapshot.hasError || !userSnapshot.hasData || !userSnapshot.data!.exists) {
+            print("Error or missing user data in ManagePlayersScreen: ${userSnapshot.error ?? 'Document does not exist.'}");
+            return Center(child: Text('Failed to load user permissions.'));
+          }
+
+          final userData = userSnapshot.data!.data();
+          final userRole = userData?['role'] ?? 'Fan';
+          final bool canManagePlayers = userRole == 'Coach' || userRole == 'Admin';
+
+          if (!canManagePlayers) {
+            return Center(child: Text('You do not have permission to manage players.'));
+          }
+
+          // User is authorized, show the content
+          return Column(
+            children: [
+              // Team Selection Dropdown
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: 'Select Team to Manage',
+                    // Conditionally disable if no teams are loaded
+                    enabled: _teamDropdownItems.isNotEmpty,
+                  ),
+                  value: _selectedTeamId,
+                  items: _teamDropdownItems,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedTeamId = newValue;
+                    });
+                  },
+                  validator: (val) => val == null ? 'Please select a team' : null,
+                ),
               ),
-              value: _selectedTeamId, // Current selected value
-              items: _teamDropdownItems, // List of dropdown items
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedTeamId = newValue;
-                });
-              },
-              validator: (val) => val == null ? 'Please select a team' : null,
-            ),
-          ),
-          Expanded( // Allow the player list to take the remaining space
-            child: _selectedTeamId == null
-                ? Center(child: Text('Please select a team to view players.'))
-                : StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('players')
-                  .where('teamId', isEqualTo: _selectedTeamId) // Filter players by the selected team ID
-                  .orderBy('playerName') // Order players alphabetically
-                  .snapshots(),
-              builder: (context, playerSnapshot) {
-                // Show loading indicator for player data
-                if (playerSnapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
+              Expanded(
+                child: _selectedTeamId == null
+                    ? Center(child: Text('Please select a team to view players.'))
+                    : StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('players')
+                      .where('teamId', isEqualTo: _selectedTeamId)
+                      .orderBy('playerName')
+                      .snapshots(),
+                  builder: (context, playerSnapshot) {
+                    if (playerSnapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
 
-                // Handle errors fetching player data
-                if (playerSnapshot.hasError) {
-                  print("Error fetching players for team $_selectedTeamId: ${playerSnapshot.error}");
-                  return Center(child: Text('Error loading players.'));
-                }
+                    if (playerSnapshot.hasError) {
+                      print("Error fetching players for team $_selectedTeamId: ${playerSnapshot.error}");
+                      return Center(child: Text('Error loading players.'));
+                    }
 
-                final players = playerSnapshot.data!.docs;
+                    final players = playerSnapshot.data!.docs;
 
-                if (players.isEmpty) {
-                  return Center(child: Text('No players registered for this team yet.'));
-                }
+                    if (players.isEmpty) {
+                      return Center(child: Text('No players registered for this team yet.'));
+                    }
 
-                // Display the list of players with edit/delete options
-                return ListView.builder(
-                  itemCount: players.length,
-                  itemBuilder: (context, index) {
-                    final player = players[index].data() as Map<String, dynamic>;
-                    final playerId = players[index].id; // Get player document ID (which is now the user's UID)
-                    final playerName = player['playerName'] ?? 'Unknown Player';
-                    final playerPosition = player['position'] ?? 'N/A';
+                    return ListView.builder(
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index].data() as Map<String, dynamic>;
+                        final playerId = players[index].id;
+                        final playerName = player['playerName'] ?? 'Unknown Player';
+                        final playerPosition = player['position'] ?? 'N/A';
 
-                    return Card(
-                      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                      child: ListTile(
-                        leading: Icon(Icons.person), // Player icon
-                        title: Text(playerName),
-                        subtitle: Text('Position: $playerPosition'),
-                        trailing: Row( // Use a Row for multiple trailing icons
-                          mainAxisSize: MainAxisSize.min, // Keep the row size minimal
-                          children: [
-                            // Edit Icon Button
-                            IconButton(
-                              icon: Icon(Icons.edit),
-                              tooltip: 'Edit Player',
-                              onPressed: () {
-                                // Navigate to PlayerRegistrationScreen for editing, passing only the playerId
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => PlayerRegistrationScreen(
-                                      playerId: playerId, teamId: '', // Pass the player ID for editing
-                                    ),
-                                  ),
-                                );
-                              },
+                        return Card(
+                          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                          child: ListTile(
+                            leading: Icon(Icons.person),
+                            title: Text(playerName),
+                            subtitle: Text('Position: $playerPosition'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit),
+                                  tooltip: 'Edit Player',
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => PlayerRegistrationScreen(
+                                          playerId: playerId, teamId: _selectedTeamId ?? '', // Pass the player ID and selected team ID
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  tooltip: 'Delete Player',
+                                  onPressed: () {
+                                    _deletePlayer(context, playerId, playerName);
+                                  },
+                                ),
+                              ],
                             ),
-                            // Delete Icon Button
-                            IconButton(
-                              icon: Icon(Icons.delete, color: Colors.red),
-                              tooltip: 'Delete Player',
-                              onPressed: () {
-                                // Call the delete function
-                                _deletePlayer(context, playerId, playerName);
-                              },
-                            ),
-                          ],
-                        ),
-                        // Optional: Add onTap for viewing player profile without edit/delete
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PlayerProfileScreen(playerId: playerId),
-                            ),
-                          );
-                        },
-                      ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PlayerProfileScreen(playerId: playerId),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

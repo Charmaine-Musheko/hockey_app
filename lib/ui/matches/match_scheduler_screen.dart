@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // For date formatting
-import 'package:hockey_union_app/services/auth_service.dart'; // Import AuthService to get user data
 import 'package:hockey_union_app/ui/matches/add_edit_match_screen.dart'; // Import the Add/Edit screen
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth for current user
-import 'package:hockey_union_app/utils/app_colors.dart'; // Import your new AppColors
+import 'package:hockey_union_app/utils/app_colors.dart';
+
+import '../../services/auth_service.dart'; // Import your new AppColors
 
 class MatchScheduleScreen extends StatelessWidget {
   final String userId; // Accept the user ID
@@ -41,7 +42,6 @@ class MatchScheduleScreen extends StatelessWidget {
         );
         return;
       }
-
 
       // Create a new booking document
       await matchBookingsRef.add({ // Use add() to let Firestore generate an ID
@@ -82,9 +82,9 @@ class MatchScheduleScreen extends StatelessWidget {
         foregroundColor: AppColors.white, // White text/icons
         elevation: 0, // No shadow
       ),
-      // Use a FutureBuilder to fetch the current user's role
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: _auth.getUserData(userId), // Fetch user data using the passed userId
+      // --- CRITICAL CHANGE HERE: Use StreamBuilder instead of FutureBuilder ---
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _auth.getUserDataStream(userId), // <--- Use the new Stream method
         builder: (context, userSnapshot) {
           // Show loading indicator while fetching user data
           if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -92,14 +92,14 @@ class MatchScheduleScreen extends StatelessWidget {
           }
 
           // Handle error or missing user data
-          if (userSnapshot.hasError || !userSnapshot.hasData || userSnapshot.data == null) {
-            print("Error fetching user data in MatchScheduleScreen: ${userSnapshot.error}");
+          if (userSnapshot.hasError || !userSnapshot.hasData || !userSnapshot.data!.exists) {
+            print("Error or missing user data in MatchScheduleScreen: ${userSnapshot.error ?? 'Document does not exist.'}");
             return Center(child: Text('Error loading user data for permissions.', style: TextStyle(color: AppColors.white)));
           }
 
           // User data fetched, get the role
-          final userData = userSnapshot.data!;
-          final userRole = userData['role'] ?? 'Fan'; // Default to 'Fan'
+          final userData = userSnapshot.data!.data();
+          final userRole = userData?['role'] ?? 'Fan'; // Default to 'Fan'
 
           // Determine if the user is allowed to edit matches
           final bool canEditMatches = userRole == 'Coach' || userRole == 'Admin';
